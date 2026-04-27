@@ -123,7 +123,7 @@ def login():
         cur.close()
         conn.close()
 
-        if user and check_password_hash(user["password_hash"], password):
+        if user and user["password_hash"] and check_password_hash(user["password_hash"], password):
             session["user_id"] = user["id"]
             return redirect(url_for("dashboard"))
 
