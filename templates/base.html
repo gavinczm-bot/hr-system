@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HR Leave System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 30px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+
+        th {
+            background: #f2f2f2;
+        }
+
+        .nav {
+            margin-bottom: 20px;
+        }
+
+        .nav a {
+            margin-right: 15px;
+        }
+
+        .flash {
+            background: #fff3cd;
+            padding: 10px;
+            border: 1px solid #ffeeba;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>HR Leave System</h1>
+
+{% if current_user %}
+<div class="nav">
+    Logged in as: <b>{{ current_user.username }}</b>
+    {% if current_user.employee_name %}
+        - {{ current_user.employee_name }}
+    {% endif %}
+    - Role: {{ current_user.role }}
+
+    <br><br>
+
+    <a href="{{ url_for('dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('new_leave') }}">Submit Leave</a>
+
+    {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('admin_employees') }}">Admin Employees</a>
+    {% endif %}
+
+    <a href="{{ url_for('logout') }}">Logout</a>
+</div>
+{% endif %}
+
+{% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for msg in messages %}
+            <div class="flash">{{ msg }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<hr>
+
+{% block content %}{% endblock %}
+
+</body>
+</html>

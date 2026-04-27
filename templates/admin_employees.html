@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Admin - Employees</h2>
+
+<a href="{{ url_for('add_employee') }}">Add Employee</a>
+
+<h3>Employees</h3>
+
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Department</th>
+        <th>Supervisor</th>
+    </tr>
+
+    {% for e in employees %}
+    <tr>
+        <td>{{ e.id }}</td>
+        <td>{{ e.name }}</td>
+        <td>{{ e.email }}</td>
+        <td>{{ e.department }}</td>
+        <td>{{ e.supervisor_name or '' }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+
+<h3>User Accounts</h3>
+
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Username</th>
+        <th>Role</th>
+        <th>Linked Employee</th>
+    </tr>
+
+    {% for u in users %}
+    <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.username }}</td>
+        <td>{{ u.role }}</td>
+        <td>{{ u.employee_name or '' }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

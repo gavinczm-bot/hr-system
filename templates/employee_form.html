@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Add Employee</h2>
+
+<form method="post">
+    Name:<br>
+    <input type="text" name="name" required>
+    <br><br>
+
+    Email:<br>
+    <input type="email" name="email">
+    <br><br>
+
+    Department:<br>
+    <input type="text" name="department">
+    <br><br>
+
+    Supervisor:<br>
+    <select name="supervisor_id">
+        <option value="">No Supervisor</option>
+        {% for s in supervisors %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+    </select>
+    <br><br>
+
+    Username:<br>
+    <input type="text" name="username" required>
+    <br><br>
+
+    Password:<br>
+    <input type="password" name="password" required>
+    <br><br>
+
+    Role:<br>
+    <select name="role">
+        <option value="employee">Employee</option>
+        <option value="admin">Admin</option>
+    </select>
+    <br><br>
+
+    <button type="submit">Create Employee</button>
+</form>
+
+{% endblock %}

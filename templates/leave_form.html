@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Submit Leave Request</h2>
+
+<form method="post">
+    Leave Type:<br>
+    <select name="leave_type" required>
+        <option value="Annual Leave">Annual Leave</option>
+        <option value="Sick Leave">Sick Leave</option>
+        <option value="Personal Leave">Personal Leave</option>
+        <option value="Unpaid Leave">Unpaid Leave</option>
+    </select>
+    <br><br>
+
+    Start Date:<br>
+    <input type="date" name="start_date" required>
+    <br><br>
+
+    End Date:<br>
+    <input type="date" name="end_date" required>
+    <br><br>
+
+    Reason:<br>
+    <textarea name="reason" rows="5" cols="50"></textarea>
+    <br><br>
+
+    <button type="submit">Submit Leave Request</button>
+</form>
+
+{% endblock %}

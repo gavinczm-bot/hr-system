@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form method="post">
+    Name: <input type="text" name="name" value="{{ emp.name if emp else '' }}"><br><br>
+    Department: <input type="text" name="department" value="{{ emp.department if emp else '' }}"><br><br>
+    Salary: <input type="number" name="salary" value="{{ emp.salary if emp else '' }}"><br><br>
+
+    <button type="submit">Save</button>
+</form>
+{% endblock %}
