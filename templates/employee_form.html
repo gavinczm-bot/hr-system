@@ -2,46 +2,84 @@
 
 {% block content %}
 
-<h2>Add Employee</h2>
+{% if mode == 'edit' %}
+    <h2>Edit Employee</h2>
+{% else %}
+    <h2>Add Employee</h2>
+{% endif %}
 
 <form method="post">
     Name:<br>
-    <input type="text" name="name" required>
+    <input type="text" name="name" required value="{{ emp.name if emp else '' }}">
     <br><br>
 
     Email:<br>
-    <input type="email" name="email">
+    <input type="email" name="email" value="{{ emp.email if emp else '' }}">
     <br><br>
 
     Department:<br>
-    <input type="text" name="department">
+    <input type="text" name="department" value="{{ emp.department if emp else '' }}">
     <br><br>
 
     Supervisor:<br>
     <select name="supervisor_id">
         <option value="">No Supervisor</option>
+
         {% for s in supervisors %}
-            <option value="{{ s.id }}">{{ s.name }}</option>
+            <option value="{{ s.id }}"
+                {% if emp and emp.supervisor_id == s.id %}
+                    selected
+                {% endif %}
+            >
+                {{ s.name }}
+            </option>
         {% endfor %}
     </select>
     <br><br>
 
     Username:<br>
-    <input type="text" name="username" required>
+    <input type="text" name="username" required value="{{ user_account.username if user_account else '' }}">
     <br><br>
 
     Password:<br>
-    <input type="password" name="password" required>
+    {% if mode == 'edit' %}
+        <input type="password" name="password">
+        <br>
+        <small>Leave blank to keep current password.</small>
+    {% else %}
+        <input type="password" name="password" required>
+    {% endif %}
     <br><br>
 
     Role:<br>
     <select name="role">
-        <option value="employee">Employee</option>
-        <option value="admin">Admin</option>
+        <option value="employee"
+            {% if user_account and user_account.role == 'employee' %}
+                selected
+            {% endif %}
+        >
+            Employee
+        </option>
+
+        <option value="admin"
+            {% if user_account and user_account.role == 'admin' %}
+                selected
+            {% endif %}
+        >
+            Admin
+        </option>
     </select>
     <br><br>
 
-    <button type="submit">Create Employee</button>
+    <button type="submit">
+        {% if mode == 'edit' %}
+            Save Changes
+        {% else %}
+            Create Employee
+        {% endif %}
+    </button>
+
+    <a href="{{ url_for('admin_employees') }}">Cancel</a>
 </form>
 
 {% endblock %}

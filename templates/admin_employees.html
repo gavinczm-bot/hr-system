@@ -4,9 +4,9 @@
 
 <h2>Admin - Employees</h2>
 
-<a href="{{ url_for('add_employee') }}">Add Employee</a>
-
-<h3>Employees</h3>
+<p>
+    <a href="{{ url_for('add_employee') }}">Add Employee</a>
+</p>
 
 <table>
     <tr>
@@ -15,36 +15,27 @@
         <th>Email</th>
         <th>Department</th>
         <th>Supervisor</th>
+        <th>Username</th>
+        <th>Role</th>
+        <th>Action</th>
     </tr>
 
     {% for e in employees %}
     <tr>
         <td>{{ e.id }}</td>
         <td>{{ e.name }}</td>
-        <td>{{ e.email }}</td>
-        <td>{{ e.department }}</td>
+        <td>{{ e.email or '' }}</td>
+        <td>{{ e.department or '' }}</td>
         <td>{{ e.supervisor_name or '' }}</td>
+        <td>{{ e.username or '' }}</td>
+        <td>{{ e.role or '' }}</td>
+        <td>
+            <a href="{{ url_for('edit_employee', employee_id=e.id) }}">Edit</a>
+        </td>
     </tr>
-    {% endfor %}
-</table>
-
-
-<h3>User Accounts</h3>
-
-<table>
+    {% else %}
     <tr>
-        <th>ID</th>
-        <th>Username</th>
-        <th>Role</th>
-        <th>Linked Employee</th>
-    </tr>
-
-    {% for u in users %}
-    <tr>
-        <td>{{ u.id }}</td>
-        <td>{{ u.username }}</td>
-        <td>{{ u.role }}</td>
-        <td>{{ u.employee_name or '' }}</td>
+        <td colspan="8">No employees found.</td>
     </tr>
     {% endfor %}
 </table>
