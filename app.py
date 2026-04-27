@@ -1,70 +1,55 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
-from functools import wraps
-from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, render_template, request, redirect, url_for, session
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import os
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
+app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
 
 
 # ---------------- DB ----------------
 def get_db():
-    DATABASE_URL = os.environ.get("DATABASE_URL")
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    database_url = os.environ.get("DATABASE_URL")
+
+    if not database_url:
+        raise RuntimeError("DATABASE_URL environment variable is missing.")
+
+    conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+    return conn
 
 
 def init_db():
     conn = get_db()
     cur = conn.cursor()
 
-    # Users table
+    # User table
+    # Use "users" instead of "user" because user can cause issues in PostgreSQL
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username TEXT UNIQUE,
-        password_hash TEXT,
-        role TEXT DEFAULT 'employee',
-        employee_id INTEGER
-    )
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL
+        )
     """)
 
-    # Employees table
+    # Employee table
     cur.execute("""
-    CREATE TABLE IF NOT EXISTS employees (
-        id SERIAL PRIMARY KEY,
-        name TEXT,
-        email TEXT,
-        department TEXT,
-        supervisor_id INTEGER
-    )
-    """)
-
-    # Leave requests table
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS leave_requests (
-        id SERIAL PRIMARY KEY,
-        employee_id INTEGER,
-        leave_type TEXT,
-        start_date DATE,
-        end_date DATE,
-        reason TEXT,
-        status TEXT DEFAULT 'Pending',
-        submitted_at TIMESTAMP,
-        reviewed_by INTEGER,
-        reviewed_at TIMESTAMP,
-        review_comment TEXT
-    )
+        CREATE TABLE IF NOT EXISTS employee (
+            id SERIAL PRIMARY KEY,
+            name TEXT,
+            department TEXT,
+            salary NUMERIC
+        )
     """)
 
     # Default admin user
+    # This will also reset admin password back to paper1234 if admin already exists
     cur.execute("""
-    INSERT INTO users (username, password_hash, role)
-    VALUES (%s, %s, 'admin')
-    ON CONFLICT (username) DO NOTHING
-    """, ("admin", generate_password_hash("admin1234")))
+        INSERT INTO users (username, password)
+        VALUES (%s, %s)
+        ON CONFLICT (username)
+        DO UPDATE SET password = EXCLUDED.password
+    """, ("admin", "paper1234"))
 
     conn.commit()
     cur.close()
@@ -72,42 +57,16 @@ def init_db():
 
 
 # ---------------- AUTH ----------------
-def current_user():
-    if "user_id" not in session:
-        return None
-
-    conn = get_db()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT u.*, e.name AS employee_name, e.supervisor_id
-        FROM users u
-        LEFT JOIN employees e ON e.id = u.employee_id
-        WHERE u.id = %s
-    """, (session["user_id"],))
-
-    user = cur.fetchone()
-
-    cur.close()
-    conn.close()
-    return user
-
-
 def login_required(func):
-    @wraps(func)
     def wrapper(*args, **kwargs):
-        if "user_id" not in session:
+        if "user" not in session:
             return redirect(url_for("login"))
         return func(*args, **kwargs)
+
+    wrapper.__name__ = func.__name__
     return wrapper
 
 
-@app.context_processor
-def inject_user():
-    return {"current_user": current_user()}
-
-
-# ---------------- LOGIN ----------------
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
@@ -117,135 +76,146 @@ def login():
         conn = get_db()
         cur = conn.cursor()
 
-        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
+        cur.execute(
+            "SELECT * FROM users WHERE username = %s AND password = %s",
+            (username, password)
+        )
+
         user = cur.fetchone()
 
         cur.close()
         conn.close()
 
-        if user and user["password_hash"] and check_password_hash(user["password_hash"], password):
-            session["user_id"] = user["id"]
-            return redirect(url_for("dashboard"))
+        print("Input:", username, password)
+        print("DB result:", user)
 
-        flash("Login failed")
+        if user:
+            session["user"] = username
+            return redirect(url_for("index"))
+        else:
+            return "Login Failed"
 
     return render_template("login.html")
 
 
 @app.route("/logout")
 def logout():
-    session.clear()
+    session.pop("user", None)
     return redirect(url_for("login"))
 
 
-# ---------------- DASHBOARD ----------------
+# ---------------- ROUTES ----------------
 @app.route("/")
 @login_required
-def dashboard():
-    user = current_user()
+def index():
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT lr.*, e.name AS employee_name
-        FROM leave_requests lr
-        JOIN employees e ON e.id = lr.employee_id
-        ORDER BY lr.submitted_at DESC
+        SELECT *
+        FROM employee
+        ORDER BY id
     """)
-    all_requests = cur.fetchall()
+
+    employees = cur.fetchall()
 
     cur.close()
     conn.close()
 
-    return render_template("dashboard.html", all_requests=all_requests)
+    return render_template("index.html", employees=employees)
 
 
-# ---------------- NEW LEAVE ----------------
-@app.route("/leave/new", methods=["GET", "POST"])
+@app.route("/add", methods=["GET", "POST"])
 @login_required
-def new_leave():
-    user = current_user()
-
-    if not user["employee_id"]:
-        flash("No employee linked")
-        return redirect(url_for("dashboard"))
-
-    if request.method == "POST":
-        leave_type = request.form["leave_type"]
-        start_date = request.form["start_date"]
-        end_date = request.form["end_date"]
-        reason = request.form["reason"]
-
-        conn = get_db()
-        cur = conn.cursor()
-
-        cur.execute("""
-            INSERT INTO leave_requests
-            (employee_id, leave_type, start_date, end_date, reason, submitted_at)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (
-            user["employee_id"],
-            leave_type,
-            start_date,
-            end_date,
-            reason,
-            datetime.now()
-        ))
-
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        flash("Leave submitted")
-        return redirect(url_for("dashboard"))
-
-    return render_template("leave_form.html")
-
-
-# ---------------- ADMIN ADD EMPLOYEE ----------------
-@app.route("/admin/add", methods=["GET", "POST"])
-@login_required
-def add_employee():
+def add():
     if request.method == "POST":
         name = request.form["name"]
-        email = request.form["email"]
-        department = request.form["department"]
-        username = request.form["username"]
-        password = request.form["password"]
+        dept = request.form["department"]
+        salary = request.form["salary"]
 
         conn = get_db()
         cur = conn.cursor()
 
-        # create employee
-        cur.execute("""
-            INSERT INTO employees (name, email, department)
+        cur.execute(
+            """
+            INSERT INTO employee (name, department, salary)
             VALUES (%s, %s, %s)
-            RETURNING id
-        """, (name, email, department))
-
-        employee_id = cur.fetchone()["id"]
-
-        # create user
-        cur.execute("""
-            INSERT INTO users (username, password_hash, employee_id)
-            VALUES (%s, %s, %s)
-        """, (
-            username,
-            generate_password_hash(password),
-            employee_id
-        ))
+            """,
+            (name, dept, salary)
+        )
 
         conn.commit()
         cur.close()
         conn.close()
 
-        flash("Employee created")
-        return redirect(url_for("dashboard"))
+        return redirect(url_for("index"))
 
-    return render_template("employee_form.html")
+    return render_template("form.html", emp=None)
+
+
+@app.route("/edit/<int:id>", methods=["GET", "POST"])
+@login_required
+def edit(id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    if request.method == "POST":
+        name = request.form["name"]
+        dept = request.form["department"]
+        salary = request.form["salary"]
+
+        cur.execute(
+            """
+            UPDATE employee
+            SET name = %s,
+                department = %s,
+                salary = %s
+            WHERE id = %s
+            """,
+            (name, dept, salary, id)
+        )
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return redirect(url_for("index"))
+
+    cur.execute(
+        "SELECT * FROM employee WHERE id = %s",
+        (id,)
+    )
+
+    emp = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    return render_template("form.html", emp=emp)
+
+
+@app.route("/delete/<int:id>")
+@login_required
+def delete(id):
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "DELETE FROM employee WHERE id = %s",
+        (id,)
+    )
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return redirect(url_for("index"))
 
 
 # ---------------- RUN ----------------
+# Important for Render / gunicorn:
+# This runs when app.py is imported, so tables are created even when using gunicorn app:app
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run()
