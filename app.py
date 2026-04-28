@@ -3,6 +3,10 @@ import os
 import io
 import csv
 import zipfile
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from html import escape
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
@@ -139,6 +143,177 @@ def save_leave_attachment(cur, leave_request_id, attachment):
     return True
 
 
+
+# ---------------- EMAIL HELPERS ----------------
+def email_configured():
+    return bool(os.environ.get("SMTP_HOST") and os.environ.get("SMTP_FROM_EMAIL"))
+
+
+def smtp_use_tls():
+    return os.environ.get("SMTP_USE_TLS", "true").strip().lower() not in ["0", "false", "no", "off"]
+
+
+def build_absolute_url(endpoint, **values):
+    base_url = os.environ.get("APP_BASE_URL", "").strip().rstrip("/")
+
+    if base_url:
+        relative_url = url_for(endpoint, **values)
+        return base_url + relative_url
+
+    return url_for(endpoint, _external=True, **values)
+
+
+def send_html_email(to_addresses, subject, html_body):
+    if isinstance(to_addresses, str):
+        to_addresses = [to_addresses]
+
+    recipients = []
+    for addr in to_addresses or []:
+        addr = (addr or "").strip()
+        if addr and addr not in recipients:
+            recipients.append(addr)
+
+    if not recipients:
+        return False
+
+    smtp_host = os.environ.get("SMTP_HOST", "").strip()
+    smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+    smtp_username = os.environ.get("SMTP_USERNAME", "").strip()
+    smtp_password = os.environ.get("SMTP_PASSWORD", "")
+    from_email = os.environ.get("SMTP_FROM_EMAIL", "").strip()
+    from_name = os.environ.get("SMTP_FROM_NAME", "HR Leave System").strip()
+
+    if not smtp_host or not from_email:
+        print("Email skipped: SMTP_HOST or SMTP_FROM_EMAIL is missing.")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = f"{from_name} <{from_email}>"
+    msg["To"] = ", ".join(recipients)
+    msg.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as smtp:
+            if smtp_use_tls():
+                smtp.starttls()
+
+            if smtp_username:
+                smtp.login(smtp_username, smtp_password)
+
+            smtp.sendmail(from_email, recipients, msg.as_string())
+
+        return True
+
+    except Exception as e:
+        print("Email send failed: " + str(e))
+        return False
+
+
+def get_leave_email_context(cur, leave_request_id):
+    cur.execute("""
+        SELECT
+            lr.*,
+            e.name AS employee_name,
+            e.email AS employee_email,
+            e.department,
+            s.name AS supervisor_name,
+            s.email AS supervisor_email,
+            reviewer.username AS reviewer_name,
+            (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
+        FROM leave_requests lr
+        JOIN employee e ON e.id = lr.employee_id
+        LEFT JOIN employee s ON s.id = e.supervisor_id
+        LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
+        WHERE lr.id = %s
+    """, (leave_request_id,))
+
+    return cur.fetchone()
+
+
+def format_leave_email_body(leave, heading, message):
+    view_link = build_absolute_url("view_leave", request_id=leave["id"])
+
+    attachment_text = "Yes" if leave.get("attachment_count", 0) else "No"
+
+    return f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; font-size: 14px; color: #222;">
+            <h2>{escape(heading)}</h2>
+            <p>{escape(message)}</p>
+
+            <table cellpadding="6" cellspacing="0" border="1" style="border-collapse: collapse;">
+                <tr><th align="left">Leave ID</th><td>{escape(str(leave.get('id', '')))}</td></tr>
+                <tr><th align="left">Employee</th><td>{escape(str(leave.get('employee_name') or ''))}</td></tr>
+                <tr><th align="left">Department</th><td>{escape(str(leave.get('department') or ''))}</td></tr>
+                <tr><th align="left">Leave Type</th><td>{escape(str(leave.get('leave_type') or ''))}</td></tr>
+                <tr><th align="left">Start</th><td>{escape(str(leave.get('start_date') or ''))} {escape(str(leave.get('start_time') or ''))}</td></tr>
+                <tr><th align="left">Finish</th><td>{escape(str(leave.get('end_date') or ''))} {escape(str(leave.get('end_time') or ''))}</td></tr>
+                <tr><th align="left">Reason</th><td>{escape(str(leave.get('reason') or ''))}</td></tr>
+                <tr><th align="left">Attachment</th><td>{attachment_text}</td></tr>
+                <tr><th align="left">Status</th><td>{escape(str(leave.get('status') or ''))}</td></tr>
+                <tr><th align="left">Review Comment</th><td>{escape(str(leave.get('review_comment') or ''))}</td></tr>
+            </table>
+
+            <p><a href="{escape(view_link)}">Open leave request</a></p>
+        </body>
+        </html>
+    """
+
+
+def supervisor_recipients(leave):
+    recipients = []
+
+    if leave.get("supervisor_email"):
+        recipients.append(leave["supervisor_email"])
+
+    fallback_email = os.environ.get("HR_ADMIN_EMAIL", "").strip()
+    if not recipients and fallback_email:
+        recipients.append(fallback_email)
+
+    return recipients
+
+
+def notify_leave_submitted(leave):
+    subject = f"Leave request submitted - {leave.get('employee_name', '')} - #{leave.get('id')}"
+    body = format_leave_email_body(
+        leave,
+        "Leave Request Submitted",
+        "A leave request has been submitted and is waiting for approval."
+    )
+    return send_html_email(supervisor_recipients(leave), subject, body)
+
+
+def notify_leave_updated(leave, was_approved):
+    subject = f"Leave request updated - {leave.get('employee_name', '')} - #{leave.get('id')}"
+
+    if was_approved:
+        message = "An approved leave request has been edited. It has been moved back to Pending and needs approval again."
+    else:
+        message = "A leave request has been updated and is waiting for approval."
+
+    body = format_leave_email_body(leave, "Leave Request Updated", message)
+    return send_html_email(supervisor_recipients(leave), subject, body)
+
+
+def notify_leave_cancelled(leave):
+    subject = f"Leave request cancelled - {leave.get('employee_name', '')} - #{leave.get('id')}"
+    body = format_leave_email_body(
+        leave,
+        "Leave Request Cancelled",
+        "A leave request has been cancelled."
+    )
+    return send_html_email(supervisor_recipients(leave), subject, body)
+
+
+def notify_leave_reviewed(leave):
+    subject = f"Leave request {str(leave.get('status', '')).lower()} - #{leave.get('id')}"
+    body = format_leave_email_body(
+        leave,
+        f"Leave Request {leave.get('status', '')}",
+        "Your leave request has been reviewed."
+    )
+    return send_html_email(leave.get("employee_email"), subject, body)
 def build_admin_leave_request_query(filter_start, filter_end, filter_status, include_attachment_list=False):
     attachment_select = """
             (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
@@ -533,7 +708,10 @@ def new_leave():
 
             save_leave_attachment(cur, leave_request_id, attachment)
 
+            leave_for_email = get_leave_email_context(cur, leave_request_id)
+
             conn.commit()
+            notify_leave_submitted(leave_for_email)
             flash("Leave request submitted.")
 
         except Exception as e:
@@ -742,9 +920,13 @@ def edit_leave(request_id):
 
             save_leave_attachment(cur, request_id, attachment)
 
-            conn.commit()
+            leave_for_email = get_leave_email_context(cur, request_id)
+            was_approved = leave["status"] == "Approved"
 
-            if leave["status"] == "Approved":
+            conn.commit()
+            notify_leave_updated(leave_for_email, was_approved)
+
+            if was_approved:
                 flash("Leave request updated. It has been moved back to Pending and needs supervisor approval again.")
             else:
                 flash("Leave request updated.")
@@ -817,7 +999,10 @@ def cancel_leave(request_id):
         WHERE id = %s
     """, (request_id,))
 
+    leave_for_email = get_leave_email_context(cur, request_id)
+
     conn.commit()
+    notify_leave_cancelled(leave_for_email)
     cur.close()
     conn.close()
 
@@ -901,7 +1086,10 @@ def review_leave(request_id):
             request_id
         ))
 
+        leave_for_email = get_leave_email_context(cur, request_id)
+
         conn.commit()
+        notify_leave_reviewed(leave_for_email)
         cur.close()
         conn.close()
 
