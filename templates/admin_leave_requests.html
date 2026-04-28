@@ -22,6 +22,9 @@
 
     <button type="submit">Filter</button>
     <a href="{{ url_for('admin_leave_requests') }}">Clear</a>
+    <a href="{{ url_for('export_admin_leave_requests', start_date=filter_start, end_date=filter_end, status=filter_status) }}">
+        <button type="button">Export Filtered</button>
+    </a>
 </form>
 
 <table>

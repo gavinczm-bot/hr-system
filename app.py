@@ -1,6 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import os
 import io
+import csv
+import zipfile
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
@@ -135,6 +137,55 @@ def save_leave_attachment(cur, leave_request_id, attachment):
     ))
 
     return True
+
+
+def build_admin_leave_request_query(filter_start, filter_end, filter_status, include_attachment_list=False):
+    attachment_select = """
+            (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
+    """
+
+    if include_attachment_list:
+        attachment_select += """,
+            (
+                SELECT STRING_AGG(la.file_name, ', ' ORDER BY la.uploaded_at DESC, la.id DESC)
+                FROM leave_attachments la
+                WHERE la.leave_request_id = lr.id
+            ) AS attachment_files
+        """
+
+    sql = f"""
+        SELECT
+            lr.*,
+            e.name AS employee_name,
+            e.email AS employee_email,
+            e.department,
+            reviewer.username AS reviewer_name,
+            {attachment_select}
+        FROM leave_requests lr
+        JOIN employee e ON e.id = lr.employee_id
+        LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
+        WHERE 1 = 1
+    """
+
+    params = []
+
+    if filter_start:
+        sql += " AND lr.end_date >= %s "
+        params.append(filter_start)
+
+    if filter_end:
+        sql += " AND lr.start_date <= %s "
+        params.append(filter_end)
+
+    if filter_status:
+        sql += " AND lr.status = %s "
+        params.append(filter_status)
+
+    sql += """
+        ORDER BY lr.start_date DESC, lr.submitted_at DESC
+    """
+
+    return sql, params
 
 
 # ---------------- AUTH ----------------
@@ -299,36 +350,11 @@ def admin_leave_requests():
     conn = get_db()
     cur = conn.cursor()
 
-    sql = """
-        SELECT
-            lr.*,
-            e.name AS employee_name,
-            e.department,
-            reviewer.username AS reviewer_name,
-            (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
-        FROM leave_requests lr
-        JOIN employee e ON e.id = lr.employee_id
-        LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
-        WHERE 1 = 1
-    """
-
-    params = []
-
-    if filter_start:
-        sql += " AND lr.end_date >= %s "
-        params.append(filter_start)
-
-    if filter_end:
-        sql += " AND lr.start_date <= %s "
-        params.append(filter_end)
-
-    if filter_status:
-        sql += " AND lr.status = %s "
-        params.append(filter_status)
-
-    sql += """
-        ORDER BY lr.start_date DESC, lr.submitted_at DESC
-    """
+    sql, params = build_admin_leave_request_query(
+        filter_start,
+        filter_end,
+        filter_status
+    )
 
     cur.execute(sql, params)
     all_requests = cur.fetchall()
@@ -343,6 +369,119 @@ def admin_leave_requests():
         filter_end=filter_end,
         filter_status=filter_status
     )
+
+
+@app.route("/admin/leave-requests/export")
+@login_required
+@admin_required
+def export_admin_leave_requests():
+    filter_start = request.args.get("start_date", "").strip()
+    filter_end = request.args.get("end_date", "").strip()
+    filter_status = request.args.get("status", "").strip()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    sql, params = build_admin_leave_request_query(
+        filter_start,
+        filter_end,
+        filter_status,
+        include_attachment_list=True
+    )
+
+    cur.execute(sql, params)
+    all_requests = cur.fetchall()
+
+    leave_ids = [r["id"] for r in all_requests]
+    attachments = []
+
+    if leave_ids:
+        cur.execute("""
+            SELECT
+                la.id,
+                la.leave_request_id,
+                la.file_name,
+                la.content_type,
+                la.file_data,
+                la.uploaded_at
+            FROM leave_attachments la
+            WHERE la.leave_request_id = ANY(%s)
+            ORDER BY la.leave_request_id, la.uploaded_at DESC, la.id DESC
+        """, (leave_ids,))
+        attachments = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+
+    writer.writerow([
+        "ID",
+        "Employee",
+        "Employee Email",
+        "Department",
+        "Leave Type",
+        "Start Date",
+        "Start Time",
+        "Finish Date",
+        "Finish Time",
+        "Reason",
+        "Attachment Count",
+        "Attachment Files",
+        "Status",
+        "Submitted At",
+        "Reviewed By",
+        "Reviewed At",
+        "Review Comment"
+    ])
+
+    for r in all_requests:
+        writer.writerow([
+            r.get("id", ""),
+            r.get("employee_name", ""),
+            r.get("employee_email", ""),
+            r.get("department", ""),
+            r.get("leave_type", ""),
+            r.get("start_date", ""),
+            r.get("start_time", ""),
+            r.get("end_date", ""),
+            r.get("end_time", ""),
+            r.get("reason", ""),
+            r.get("attachment_count", 0),
+            r.get("attachment_files", "") or "",
+            r.get("status", ""),
+            r.get("submitted_at", ""),
+            r.get("reviewer_name", ""),
+            r.get("reviewed_at", ""),
+            r.get("review_comment", "")
+        ])
+
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("leave_requests.csv", csv_buffer.getvalue())
+
+        for a in attachments:
+            safe_name = secure_filename(a["file_name"]) or f"attachment_{a['id']}"
+            zip_path = f"attachments/leave_{a['leave_request_id']}/{a['id']}_{safe_name}"
+            file_data = a["file_data"]
+            if isinstance(file_data, memoryview):
+                file_data = file_data.tobytes()
+            zf.writestr(zip_path, bytes(file_data))
+
+    zip_buffer.seek(0)
+
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    return send_file(
+        zip_buffer,
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=f"leave_requests_export_{stamp}.zip"
+    )
+
+
 
 
 # ---------------- LEAVE REQUEST ----------------
