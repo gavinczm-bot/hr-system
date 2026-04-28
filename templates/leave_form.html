@@ -4,7 +4,7 @@
 
 <h2>Submit Leave Request</h2>
 
-<form method="post">
+<form method="post" enctype="multipart/form-data">
     Leave Type:<br>
     <select name="leave_type" required>
         <option value="Annual Leave">Annual Leave</option>
@@ -18,12 +18,26 @@
     <input type="date" name="start_date" required>
     <br><br>
 
+    Start Time:<br>
+    <input type="time" name="start_time" value="09:00" required>
+    <br><br>
+
     End Date:<br>
     <input type="date" name="end_date" required>
     <br><br>
 
+    Finish Time:<br>
+    <input type="time" name="end_time" value="17:00" required>
+    <br><br>
+
     Reason:<br>
     <textarea name="reason" rows="5" cols="50"></textarea>
+    <br><br>
+
+    Attachment:<br>
+    <input type="file" name="attachment">
+    <br>
+    <small>Optional. Use this for medical certificates or supporting documents.</small>
     <br><br>
 
     <button type="submit">Submit Leave Request</button>

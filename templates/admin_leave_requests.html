@@ -30,8 +30,9 @@
         <th>Department</th>
         <th>Type</th>
         <th>Start</th>
-        <th>End</th>
+        <th>Finish</th>
         <th>Reason</th>
+        <th>Attachment</th>
         <th>Status</th>
         <th>Submitted</th>
         <th>Reviewed By</th>
@@ -46,9 +47,10 @@
         <td>{{ r.employee_name }}</td>
         <td>{{ r.department or '' }}</td>
         <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }}</td>
-        <td>{{ r.end_date }}</td>
+        <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
+        <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
         <td>{{ r.reason or '' }}</td>
+        <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
         <td>{{ r.status }}</td>
         <td>{{ r.submitted_at }}</td>
         <td>{{ r.reviewer_name or '' }}</td>
@@ -63,7 +65,7 @@
     </tr>
     {% else %}
     <tr>
-        <td colspan="13">No leave requests found.</td>
+        <td colspan="14">No leave requests found.</td>
     </tr>
     {% endfor %}
 </table>

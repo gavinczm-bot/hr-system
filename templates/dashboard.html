@@ -22,8 +22,9 @@
         <th>Employee</th>
         <th>Type</th>
         <th>Start</th>
-        <th>End</th>
+        <th>Finish</th>
         <th>Reason</th>
+        <th>Attachment</th>
         <th>Status</th>
         <th>Action</th>
     </tr>
@@ -33,9 +34,10 @@
         <td>{{ r.id }}</td>
         <td>{{ r.employee_name }}</td>
         <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }}</td>
-        <td>{{ r.end_date }}</td>
+        <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
+        <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
         <td>{{ r.reason }}</td>
+        <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
         <td>{{ r.status }}</td>
         <td>
             <a href="{{ url_for('view_leave', request_id=r.id) }}">View</a>
@@ -46,7 +48,7 @@
     </tr>
     {% else %}
     <tr>
-        <td colspan="8">No requests waiting for your approval.</td>
+        <td colspan="9">No requests waiting for your approval.</td>
     </tr>
     {% endfor %}
 </table>
@@ -59,8 +61,9 @@
         <th>ID</th>
         <th>Type</th>
         <th>Start</th>
-        <th>End</th>
+        <th>Finish</th>
         <th>Reason</th>
+        <th>Attachment</th>
         <th>Status</th>
         <th>Submitted</th>
         <th>Review Comment</th>
@@ -71,9 +74,10 @@
     <tr>
         <td>{{ r.id }}</td>
         <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }}</td>
-        <td>{{ r.end_date }}</td>
+        <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
+        <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
         <td>{{ r.reason }}</td>
+        <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
         <td>{{ r.status }}</td>
         <td>{{ r.submitted_at }}</td>
         <td>{{ r.review_comment or '' }}</td>
@@ -81,7 +85,7 @@
     </tr>
     {% else %}
     <tr>
-        <td colspan="9">No leave requests submitted.</td>
+        <td colspan="10">No leave requests submitted.</td>
     </tr>
     {% endfor %}
 </table>

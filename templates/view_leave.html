@@ -26,16 +26,30 @@
         <td>{{ leave.leave_type }}</td>
     </tr>
     <tr>
-        <th>Start Date</th>
-        <td>{{ leave.start_date }}</td>
+        <th>Start</th>
+        <td>{{ leave.start_date }} {{ leave.start_time or '' }}</td>
     </tr>
     <tr>
-        <th>End Date</th>
-        <td>{{ leave.end_date }}</td>
+        <th>Finish</th>
+        <td>{{ leave.end_date }} {{ leave.end_time or '' }}</td>
     </tr>
     <tr>
         <th>Reason</th>
         <td>{{ leave.reason or '' }}</td>
+    </tr>
+    <tr>
+        <th>Attachments</th>
+        <td>
+            {% if attachments %}
+                {% for a in attachments %}
+                    <a href="{{ url_for('download_leave_attachment', request_id=leave.id, attachment_id=a.id) }}">{{ a.file_name }}</a>
+                    {% if a.uploaded_at %} - uploaded {{ a.uploaded_at }}{% endif %}
+                    <br>
+                {% endfor %}
+            {% else %}
+                No attachment
+            {% endif %}
+        </td>
     </tr>
     <tr>
         <th>Status</th>

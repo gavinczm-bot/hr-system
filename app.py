@@ -1,5 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_file
 import os
+import io
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
@@ -59,6 +60,20 @@ def init_db():
             reviewed_by INTEGER,
             reviewed_at TIMESTAMP,
             review_comment TEXT
+        )
+    """)
+
+    cur.execute("ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS start_time TIME")
+    cur.execute("ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS end_time TIME")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS leave_attachments (
+            id SERIAL PRIMARY KEY,
+            leave_request_id INTEGER NOT NULL REFERENCES leave_requests(id) ON DELETE CASCADE,
+            file_name TEXT NOT NULL,
+            content_type TEXT,
+            file_data BYTEA NOT NULL,
+            uploaded_at TIMESTAMP NOT NULL
         )
     """)
 
@@ -191,7 +206,8 @@ def dashboard():
             SELECT
                 lr.*,
                 e.name AS employee_name,
-                reviewer.username AS reviewer_name
+                reviewer.username AS reviewer_name,
+                (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
             FROM leave_requests lr
             JOIN employee e ON e.id = lr.employee_id
             LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
@@ -204,7 +220,8 @@ def dashboard():
         cur.execute("""
             SELECT
                 lr.*,
-                e.name AS employee_name
+                e.name AS employee_name,
+                (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
             FROM leave_requests lr
             JOIN employee e ON e.id = lr.employee_id
             WHERE e.supervisor_id = %s
@@ -241,7 +258,8 @@ def admin_leave_requests():
             lr.*,
             e.name AS employee_name,
             e.department,
-            reviewer.username AS reviewer_name
+            reviewer.username AS reviewer_name,
+            (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
         FROM leave_requests lr
         JOIN employee e ON e.id = lr.employee_id
         LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
@@ -295,34 +313,74 @@ def new_leave():
         leave_type = request.form["leave_type"]
         start_date = request.form["start_date"]
         end_date = request.form["end_date"]
+        start_time = request.form.get("start_time", "").strip()
+        end_time = request.form.get("end_time", "").strip()
         reason = request.form["reason"]
+        attachment = request.files.get("attachment")
 
         if end_date < start_date:
             flash("End date cannot be before start date.")
             return redirect(url_for("new_leave"))
 
+        if not start_time or not end_time:
+            flash("Start time and finish time are required.")
+            return redirect(url_for("new_leave"))
+
+        if start_date == end_date and end_time <= start_time:
+            flash("Finish time must be after start time when leave is on the same day.")
+            return redirect(url_for("new_leave"))
+
         conn = get_db()
         cur = conn.cursor()
 
-        cur.execute("""
-            INSERT INTO leave_requests
-                (employee_id, leave_type, start_date, end_date, reason, status, submitted_at)
-            VALUES
-                (%s, %s, %s, %s, %s, 'Pending', %s)
-        """, (
-            user["employee_id"],
-            leave_type,
-            start_date,
-            end_date,
-            reason,
-            datetime.now()
-        ))
+        try:
+            cur.execute("""
+                INSERT INTO leave_requests
+                    (employee_id, leave_type, start_date, end_date, start_time, end_time, reason, status, submitted_at)
+                VALUES
+                    (%s, %s, %s, %s, %s, %s, %s, 'Pending', %s)
+                RETURNING id
+            """, (
+                user["employee_id"],
+                leave_type,
+                start_date,
+                end_date,
+                start_time,
+                end_time,
+                reason,
+                datetime.now()
+            ))
 
-        conn.commit()
+            leave_request_id = cur.fetchone()["id"]
+
+            if attachment and attachment.filename:
+                file_name = os.path.basename(attachment.filename)
+                file_data = attachment.read()
+
+                if file_data:
+                    cur.execute("""
+                        INSERT INTO leave_attachments
+                            (leave_request_id, file_name, content_type, file_data, uploaded_at)
+                        VALUES
+                            (%s, %s, %s, %s, %s)
+                    """, (
+                        leave_request_id,
+                        file_name,
+                        attachment.content_type,
+                        psycopg2.Binary(file_data),
+                        datetime.now()
+                    ))
+
+            conn.commit()
+            flash("Leave request submitted.")
+
+        except Exception as e:
+            conn.rollback()
+            flash("Error submitting leave request: " + str(e))
+
         cur.close()
         conn.close()
 
-        flash("Leave request submitted.")
         return redirect(url_for("dashboard"))
 
     return render_template("leave_form.html")
@@ -352,6 +410,16 @@ def view_leave(request_id):
 
     leave = cur.fetchone()
 
+    attachments = []
+    if leave:
+        cur.execute("""
+            SELECT id, file_name, content_type, uploaded_at
+            FROM leave_attachments
+            WHERE leave_request_id = %s
+            ORDER BY uploaded_at DESC, id DESC
+        """, (request_id,))
+        attachments = cur.fetchall()
+
     cur.close()
     conn.close()
 
@@ -370,7 +438,55 @@ def view_leave(request_id):
     return render_template(
         "view_leave.html",
         leave=leave,
+        attachments=attachments,
         can_review=(is_admin or is_supervisor)
+    )
+
+
+@app.route("/leave/<int:request_id>/attachment/<int:attachment_id>")
+@login_required
+def download_leave_attachment(request_id, attachment_id):
+    user = current_user()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            lr.employee_id,
+            e.supervisor_id,
+            la.file_name,
+            la.content_type,
+            la.file_data
+        FROM leave_attachments la
+        JOIN leave_requests lr ON lr.id = la.leave_request_id
+        JOIN employee e ON e.id = lr.employee_id
+        WHERE la.id = %s
+          AND lr.id = %s
+    """, (attachment_id, request_id))
+
+    attachment = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if not attachment:
+        flash("Attachment not found.")
+        return redirect(url_for("view_leave", request_id=request_id))
+
+    is_admin = user["role"] == "admin"
+    is_owner = user["employee_id"] and attachment["employee_id"] == user["employee_id"]
+    is_supervisor = user["employee_id"] and attachment["supervisor_id"] == user["employee_id"]
+
+    if not is_admin and not is_owner and not is_supervisor:
+        flash("You are not allowed to download this attachment.")
+        return redirect(url_for("dashboard"))
+
+    return send_file(
+        io.BytesIO(attachment["file_data"]),
+        mimetype=attachment["content_type"] or "application/octet-stream",
+        as_attachment=True,
+        download_name=attachment["file_name"]
     )
 
 
@@ -411,6 +527,14 @@ def review_leave(request_id):
         flash("You are not allowed to review this request.")
         return redirect(url_for("dashboard"))
 
+    cur.execute("""
+        SELECT id, file_name, content_type, uploaded_at
+        FROM leave_attachments
+        WHERE leave_request_id = %s
+        ORDER BY uploaded_at DESC, id DESC
+    """, (request_id,))
+    attachments = cur.fetchall()
+
     if request.method == "POST":
         action = request.form["action"]
         review_comment = request.form.get("review_comment", "")
@@ -448,7 +572,7 @@ def review_leave(request_id):
     cur.close()
     conn.close()
 
-    return render_template("review_leave.html", leave=leave)
+    return render_template("review_leave.html", leave=leave, attachments=attachments)
 
 
 # ---------------- ADMIN EMPLOYEES ----------------
