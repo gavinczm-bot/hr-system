@@ -78,6 +78,14 @@
         <a href="{{ url_for('review_leave', request_id=leave.id) }}">Review</a> |
     {% endif %}
 
+    {% if can_edit and leave.status != 'Cancelled' %}
+        <a href="{{ url_for('edit_leave', request_id=leave.id) }}">Edit</a> |
+        <form method="post" action="{{ url_for('cancel_leave', request_id=leave.id) }}" style="display:inline;" onsubmit="return confirm('Cancel this leave request?');">
+            <button type="submit">Cancel Leave</button>
+        </form>
+        |
+    {% endif %}
+
     {% if current_user.role == 'admin' %}
         <a href="{{ url_for('admin_leave_requests') }}">Back to All Leave Requests</a>
     {% else %}

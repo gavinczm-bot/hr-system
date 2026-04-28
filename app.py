@@ -5,6 +5,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
 from datetime import datetime
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
@@ -89,6 +90,51 @@ def init_db():
     conn.commit()
     cur.close()
     conn.close()
+
+
+# ---------------- LEAVE HELPERS ----------------
+def validate_leave_dates(start_date, end_date, start_time, end_time):
+    if not start_date or not end_date:
+        return "Start date and finish date are required."
+
+    if end_date < start_date:
+        return "Finish date cannot be before start date."
+
+    if not start_time or not end_time:
+        return "Start time and finish time are required."
+
+    if start_date == end_date and end_time <= start_time:
+        return "Finish time must be after start time when leave is on the same day."
+
+    return None
+
+
+def save_leave_attachment(cur, leave_request_id, attachment):
+    if not attachment or not attachment.filename:
+        return False
+
+    file_name = secure_filename(attachment.filename)
+    if not file_name:
+        return False
+
+    file_data = attachment.read()
+    if not file_data:
+        return False
+
+    cur.execute("""
+        INSERT INTO leave_attachments
+            (leave_request_id, file_name, content_type, file_data, uploaded_at)
+        VALUES
+            (%s, %s, %s, %s, %s)
+    """, (
+        leave_request_id,
+        file_name,
+        attachment.content_type,
+        psycopg2.Binary(file_data),
+        datetime.now()
+    ))
+
+    return True
 
 
 # ---------------- AUTH ----------------
@@ -318,16 +364,9 @@ def new_leave():
         reason = request.form["reason"]
         attachment = request.files.get("attachment")
 
-        if end_date < start_date:
-            flash("End date cannot be before start date.")
-            return redirect(url_for("new_leave"))
-
-        if not start_time or not end_time:
-            flash("Start time and finish time are required.")
-            return redirect(url_for("new_leave"))
-
-        if start_date == end_date and end_time <= start_time:
-            flash("Finish time must be after start time when leave is on the same day.")
+        validation_error = validate_leave_dates(start_date, end_date, start_time, end_time)
+        if validation_error:
+            flash(validation_error)
             return redirect(url_for("new_leave"))
 
         conn = get_db()
@@ -353,23 +392,7 @@ def new_leave():
 
             leave_request_id = cur.fetchone()["id"]
 
-            if attachment and attachment.filename:
-                file_name = os.path.basename(attachment.filename)
-                file_data = attachment.read()
-
-                if file_data:
-                    cur.execute("""
-                        INSERT INTO leave_attachments
-                            (leave_request_id, file_name, content_type, file_data, uploaded_at)
-                        VALUES
-                            (%s, %s, %s, %s, %s)
-                    """, (
-                        leave_request_id,
-                        file_name,
-                        attachment.content_type,
-                        psycopg2.Binary(file_data),
-                        datetime.now()
-                    ))
+            save_leave_attachment(cur, leave_request_id, attachment)
 
             conn.commit()
             flash("Leave request submitted.")
@@ -383,7 +406,7 @@ def new_leave():
 
         return redirect(url_for("dashboard"))
 
-    return render_template("leave_form.html")
+    return render_template("leave_form.html", leave=None, attachments=[], mode="new")
 
 
 @app.route("/leave/<int:request_id>/view")
@@ -439,7 +462,8 @@ def view_leave(request_id):
         "view_leave.html",
         leave=leave,
         attachments=attachments,
-        can_review=(is_admin or is_supervisor)
+        can_review=(is_admin or is_supervisor),
+        can_edit=(is_admin or is_owner)
     )
 
 
@@ -490,6 +514,178 @@ def download_leave_attachment(request_id, attachment_id):
     )
 
 
+@app.route("/leave/<int:request_id>/edit", methods=["GET", "POST"])
+@login_required
+def edit_leave(request_id):
+    user = current_user()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            lr.*,
+            e.name AS employee_name,
+            e.supervisor_id
+        FROM leave_requests lr
+        JOIN employee e ON e.id = lr.employee_id
+        WHERE lr.id = %s
+    """, (request_id,))
+
+    leave = cur.fetchone()
+
+    if not leave:
+        cur.close()
+        conn.close()
+        flash("Leave request not found.")
+        return redirect(url_for("dashboard"))
+
+    is_owner = user["employee_id"] and leave["employee_id"] == user["employee_id"]
+    is_admin = user["role"] == "admin"
+
+    if not is_owner and not is_admin:
+        cur.close()
+        conn.close()
+        flash("You are not allowed to edit this request.")
+        return redirect(url_for("dashboard"))
+
+    if leave["status"] == "Cancelled":
+        cur.close()
+        conn.close()
+        flash("Cancelled leave requests cannot be edited. Please submit a new leave request.")
+        return redirect(url_for("view_leave", request_id=request_id))
+
+    if request.method == "POST":
+        leave_type = request.form["leave_type"]
+        start_date = request.form["start_date"]
+        end_date = request.form["end_date"]
+        start_time = request.form.get("start_time", "").strip()
+        end_time = request.form.get("end_time", "").strip()
+        reason = request.form.get("reason", "")
+        attachment = request.files.get("attachment")
+        remove_attachment_ids = request.form.getlist("remove_attachment_ids")
+
+        validation_error = validate_leave_dates(start_date, end_date, start_time, end_time)
+        if validation_error:
+            flash(validation_error)
+            return redirect(url_for("edit_leave", request_id=request_id))
+
+        try:
+            cur.execute("""
+                UPDATE leave_requests
+                SET leave_type = %s,
+                    start_date = %s,
+                    end_date = %s,
+                    start_time = %s,
+                    end_time = %s,
+                    reason = %s,
+                    status = 'Pending',
+                    reviewed_by = NULL,
+                    reviewed_at = NULL,
+                    review_comment = NULL
+                WHERE id = %s
+            """, (
+                leave_type,
+                start_date,
+                end_date,
+                start_time,
+                end_time,
+                reason,
+                request_id
+            ))
+
+            for attachment_id in remove_attachment_ids:
+                cur.execute("""
+                    DELETE FROM leave_attachments
+                    WHERE id = %s
+                      AND leave_request_id = %s
+                """, (attachment_id, request_id))
+
+            save_leave_attachment(cur, request_id, attachment)
+
+            conn.commit()
+
+            if leave["status"] == "Approved":
+                flash("Leave request updated. It has been moved back to Pending and needs supervisor approval again.")
+            else:
+                flash("Leave request updated.")
+
+        except Exception as e:
+            conn.rollback()
+            flash("Error updating leave request: " + str(e))
+
+        cur.close()
+        conn.close()
+        return redirect(url_for("view_leave", request_id=request_id))
+
+    cur.execute("""
+        SELECT id, file_name, content_type, uploaded_at
+        FROM leave_attachments
+        WHERE leave_request_id = %s
+        ORDER BY uploaded_at DESC, id DESC
+    """, (request_id,))
+    attachments = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template("leave_form.html", leave=leave, attachments=attachments, mode="edit")
+
+
+@app.route("/leave/<int:request_id>/cancel", methods=["POST"])
+@login_required
+def cancel_leave(request_id):
+    user = current_user()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT employee_id, status
+        FROM leave_requests
+        WHERE id = %s
+    """, (request_id,))
+
+    leave = cur.fetchone()
+
+    if not leave:
+        cur.close()
+        conn.close()
+        flash("Leave request not found.")
+        return redirect(url_for("dashboard"))
+
+    is_owner = user["employee_id"] and leave["employee_id"] == user["employee_id"]
+    is_admin = user["role"] == "admin"
+
+    if not is_owner and not is_admin:
+        cur.close()
+        conn.close()
+        flash("You are not allowed to cancel this request.")
+        return redirect(url_for("dashboard"))
+
+    if leave["status"] == "Cancelled":
+        cur.close()
+        conn.close()
+        flash("Leave request is already cancelled.")
+        return redirect(url_for("view_leave", request_id=request_id))
+
+    cur.execute("""
+        UPDATE leave_requests
+        SET status = 'Cancelled',
+            reviewed_by = NULL,
+            reviewed_at = NULL,
+            review_comment = 'Cancelled by employee.'
+        WHERE id = %s
+    """, (request_id,))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    flash("Leave request cancelled.")
+    return redirect(url_for("dashboard"))
+
+
 @app.route("/leave/<int:request_id>/review", methods=["GET", "POST"])
 @login_required
 def review_leave(request_id):
@@ -526,6 +722,12 @@ def review_leave(request_id):
         conn.close()
         flash("You are not allowed to review this request.")
         return redirect(url_for("dashboard"))
+
+    if leave["status"] != "Pending":
+        cur.close()
+        conn.close()
+        flash("Only pending leave requests can be reviewed.")
+        return redirect(url_for("view_leave", request_id=request_id))
 
     cur.execute("""
         SELECT id, file_name, content_type, uploaded_at

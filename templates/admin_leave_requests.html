@@ -17,6 +17,7 @@
         <option value="Pending" {% if filter_status == 'Pending' %}selected{% endif %}>Pending</option>
         <option value="Approved" {% if filter_status == 'Approved' %}selected{% endif %}>Approved</option>
         <option value="Denied" {% if filter_status == 'Denied' %}selected{% endif %}>Denied</option>
+        <option value="Cancelled" {% if filter_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
     </select>
 
     <button type="submit">Filter</button>

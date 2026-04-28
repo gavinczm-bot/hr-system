@@ -2,45 +2,79 @@
 
 {% block content %}
 
-<h2>Submit Leave Request</h2>
+{% if mode == 'edit' %}
+    <h2>Edit Leave Request</h2>
+    <p>
+        Editing this request will move it back to <b>Pending</b>. If it was already approved, it must be approved by the supervisor again.
+    </p>
+{% else %}
+    <h2>Submit Leave Request</h2>
+{% endif %}
 
 <form method="post" enctype="multipart/form-data">
     Leave Type:<br>
     <select name="leave_type" required>
-        <option value="Annual Leave">Annual Leave</option>
-        <option value="Sick Leave">Sick Leave</option>
-        <option value="Personal Leave">Personal Leave</option>
-        <option value="Unpaid Leave">Unpaid Leave</option>
+        <option value="Annual Leave" {% if leave and leave.leave_type == 'Annual Leave' %}selected{% endif %}>Annual Leave</option>
+        <option value="Sick Leave" {% if leave and leave.leave_type == 'Sick Leave' %}selected{% endif %}>Sick Leave</option>
+        <option value="Personal Leave" {% if leave and leave.leave_type == 'Personal Leave' %}selected{% endif %}>Personal Leave</option>
+        <option value="Unpaid Leave" {% if leave and leave.leave_type == 'Unpaid Leave' %}selected{% endif %}>Unpaid Leave</option>
     </select>
     <br><br>
 
     Start Date:<br>
-    <input type="date" name="start_date" required>
+    <input type="date" name="start_date" required value="{{ leave.start_date if leave else '' }}">
     <br><br>
 
     Start Time:<br>
-    <input type="time" name="start_time" value="09:00" required>
+    <input type="time" name="start_time" value="{{ leave.start_time.strftime('%H:%M') if leave and leave.start_time else '09:00' }}" required>
     <br><br>
 
-    End Date:<br>
-    <input type="date" name="end_date" required>
+    Finish Date:<br>
+    <input type="date" name="end_date" required value="{{ leave.end_date if leave else '' }}">
     <br><br>
 
     Finish Time:<br>
-    <input type="time" name="end_time" value="17:00" required>
+    <input type="time" name="end_time" value="{{ leave.end_time.strftime('%H:%M') if leave and leave.end_time else '17:00' }}" required>
     <br><br>
 
     Reason:<br>
-    <textarea name="reason" rows="5" cols="50"></textarea>
+    <textarea name="reason" rows="5" cols="50">{{ leave.reason if leave else '' }}</textarea>
     <br><br>
 
-    Attachment:<br>
+    {% if mode == 'edit' and attachments %}
+        Current Attachments:<br>
+        {% for a in attachments %}
+            <label>
+                <input type="checkbox" name="remove_attachment_ids" value="{{ a.id }}">
+                Remove {{ a.file_name }}
+            </label>
+            - <a href="{{ url_for('download_leave_attachment', request_id=leave.id, attachment_id=a.id) }}">Download</a>
+            <br>
+        {% endfor %}
+        <br>
+    {% endif %}
+
+    {% if mode == 'edit' %}
+        Add Attachment:<br>
+    {% else %}
+        Attachment:<br>
+    {% endif %}
     <input type="file" name="attachment">
     <br>
     <small>Optional. Use this for medical certificates or supporting documents.</small>
     <br><br>
 
-    <button type="submit">Submit Leave Request</button>
+    <button type="submit">
+        {% if mode == 'edit' %}
+            Save Changes
+        {% else %}
+            Submit Leave Request
+        {% endif %}
+    </button>
+
+    {% if mode == 'edit' %}
+        <a href="{{ url_for('view_leave', request_id=leave.id) }}">Cancel Edit</a>
+    {% endif %}
 </form>
 
 {% endblock %}
