@@ -6,96 +6,13 @@
 
 {% if current_user.role == 'admin' %}
 
-<h3>All Leave Requests</h3>
+<h3>Admin</h3>
 
-<form method="get" action="{{ url_for('dashboard') }}" style="margin-bottom: 15px;">
-    Start Date:
-    <input type="date" name="start_date" value="{{ filter_start }}">
-
-    End Date:
-    <input type="date" name="end_date" value="{{ filter_end }}">
-
-    <button type="submit">Filter</button>
-    <a href="{{ url_for('dashboard') }}">Clear</a>
-</form>
-
-<table>
-    <tr>
-        <th>ID</th>
-        <th>Employee</th>
-        <th>Type</th>
-        <th>Start</th>
-        <th>End</th>
-        <th>Reason</th>
-        <th>Status</th>
-        <th>Submitted</th>
-        <th>Reviewed At</th>
-        <th>Review Comment</th>
-        <th>Action</th>
-    </tr>
-
-    {% for r in all_requests %}
-    <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.employee_name }}</td>
-        <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }}</td>
-        <td>{{ r.end_date }}</td>
-        <td>{{ r.reason }}</td>
-        <td>{{ r.status }}</td>
-        <td>{{ r.submitted_at }}</td>
-        <td>{{ r.reviewed_at or '' }}</td>
-        <td>{{ r.review_comment or '' }}</td>
-        <td>
-            {% if r.status == 'Pending' %}
-                <a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a>
-            {% else %}
-                -
-            {% endif %}
-        </td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="11">No leave requests found.</td>
-    </tr>
-    {% endfor %}
-</table>
-
-
-<h3>All Pending Leave Requests</h3>
-
-<table>
-    <tr>
-        <th>ID</th>
-        <th>Employee</th>
-        <th>Type</th>
-        <th>Start</th>
-        <th>End</th>
-        <th>Reason</th>
-        <th>Status</th>
-        <th>Action</th>
-    </tr>
-
-    {% for r in all_pending_requests %}
-    <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.employee_name }}</td>
-        <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }}</td>
-        <td>{{ r.end_date }}</td>
-        <td>{{ r.reason }}</td>
-        <td>{{ r.status }}</td>
-        <td><a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a></td>
-    </tr>
-    {% else %}
-    <tr>
-        <td colspan="8">No pending requests.</td>
-    </tr>
-    {% endfor %}
-</table>
+<p>
+    <a href="{{ url_for('admin_leave_requests') }}">View All Leave Requests</a>
+</p>
 
 {% endif %}
-
 
 <h3>Requests Waiting For My Approval</h3>
 
@@ -120,7 +37,12 @@
         <td>{{ r.end_date }}</td>
         <td>{{ r.reason }}</td>
         <td>{{ r.status }}</td>
-        <td><a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a></td>
+        <td>
+            <a href="{{ url_for('view_leave', request_id=r.id) }}">View</a>
+            {% if r.status == 'Pending' %}
+                | <a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a>
+            {% endif %}
+        </td>
     </tr>
     {% else %}
     <tr>
@@ -142,6 +64,7 @@
         <th>Status</th>
         <th>Submitted</th>
         <th>Review Comment</th>
+        <th>Action</th>
     </tr>
 
     {% for r in my_requests %}
@@ -154,10 +77,11 @@
         <td>{{ r.status }}</td>
         <td>{{ r.submitted_at }}</td>
         <td>{{ r.review_comment or '' }}</td>
+        <td><a href="{{ url_for('view_leave', request_id=r.id) }}">View</a></td>
     </tr>
     {% else %}
     <tr>
-        <td colspan="8">No leave requests submitted.</td>
+        <td colspan="9">No leave requests submitted.</td>
     </tr>
     {% endfor %}
 </table>

@@ -58,6 +58,7 @@
 
     {% if current_user.role == 'admin' %}
         <a href="{{ url_for('admin_employees') }}">Admin Employees</a>
+        <a href="{{ url_for('admin_leave_requests') }}">All Leave Requests</a>
     {% endif %}
 
     <a href="{{ url_for('logout') }}">Logout</a>

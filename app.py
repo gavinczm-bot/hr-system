@@ -185,10 +185,6 @@ def dashboard():
 
     my_requests = []
     approval_requests = []
-    all_requests = []
-
-    filter_start = request.args.get("start_date", "").strip()
-    filter_end = request.args.get("end_date", "").strip()
 
     if user["employee_id"]:
         cur.execute("""
@@ -218,46 +214,70 @@ def dashboard():
 
         approval_requests = cur.fetchall()
 
-    if user["role"] == "admin":
-        sql = """
-            SELECT
-                lr.*,
-                e.name AS employee_name,
-                e.department,
-                reviewer.username AS reviewer_name
-            FROM leave_requests lr
-            JOIN employee e ON e.id = lr.employee_id
-            LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
-            WHERE 1 = 1
-        """
-
-        params = []
-
-        if filter_start:
-            sql += " AND lr.end_date >= %s "
-            params.append(filter_start)
-
-        if filter_end:
-            sql += " AND lr.start_date <= %s "
-            params.append(filter_end)
-
-        sql += """
-            ORDER BY lr.start_date DESC, lr.submitted_at DESC
-        """
-
-        cur.execute(sql, params)
-        all_requests = cur.fetchall()
-
     cur.close()
     conn.close()
 
     return render_template(
         "dashboard.html",
         my_requests=my_requests,
-        approval_requests=approval_requests,
+        approval_requests=approval_requests
+    )
+
+
+# ---------------- ADMIN LEAVE REQUESTS ----------------
+@app.route("/admin/leave-requests")
+@login_required
+@admin_required
+def admin_leave_requests():
+    filter_start = request.args.get("start_date", "").strip()
+    filter_end = request.args.get("end_date", "").strip()
+    filter_status = request.args.get("status", "").strip()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    sql = """
+        SELECT
+            lr.*,
+            e.name AS employee_name,
+            e.department,
+            reviewer.username AS reviewer_name
+        FROM leave_requests lr
+        JOIN employee e ON e.id = lr.employee_id
+        LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
+        WHERE 1 = 1
+    """
+
+    params = []
+
+    if filter_start:
+        sql += " AND lr.end_date >= %s "
+        params.append(filter_start)
+
+    if filter_end:
+        sql += " AND lr.start_date <= %s "
+        params.append(filter_end)
+
+    if filter_status:
+        sql += " AND lr.status = %s "
+        params.append(filter_status)
+
+    sql += """
+        ORDER BY lr.start_date DESC, lr.submitted_at DESC
+    """
+
+    cur.execute(sql, params)
+    all_requests = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "admin_leave_requests.html",
         all_requests=all_requests,
         filter_start=filter_start,
-        filter_end=filter_end
+        filter_end=filter_end,
+        filter_status=filter_status
     )
 
 
@@ -308,6 +328,52 @@ def new_leave():
     return render_template("leave_form.html")
 
 
+@app.route("/leave/<int:request_id>/view")
+@login_required
+def view_leave(request_id):
+    user = current_user()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT
+            lr.*,
+            e.name AS employee_name,
+            e.email,
+            e.department,
+            e.supervisor_id,
+            reviewer.username AS reviewer_name
+        FROM leave_requests lr
+        JOIN employee e ON e.id = lr.employee_id
+        LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
+        WHERE lr.id = %s
+    """, (request_id,))
+
+    leave = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if not leave:
+        flash("Leave request not found.")
+        return redirect(url_for("dashboard"))
+
+    is_admin = user["role"] == "admin"
+    is_owner = user["employee_id"] and leave["employee_id"] == user["employee_id"]
+    is_supervisor = user["employee_id"] and leave["supervisor_id"] == user["employee_id"]
+
+    if not is_admin and not is_owner and not is_supervisor:
+        flash("You are not allowed to view this request.")
+        return redirect(url_for("dashboard"))
+
+    return render_template(
+        "view_leave.html",
+        leave=leave,
+        can_review=(is_admin or is_supervisor)
+    )
+
+
 @app.route("/leave/<int:request_id>/review", methods=["GET", "POST"])
 @login_required
 def review_leave(request_id):
@@ -320,6 +386,8 @@ def review_leave(request_id):
         SELECT
             lr.*,
             e.name AS employee_name,
+            e.email,
+            e.department,
             e.supervisor_id
         FROM leave_requests lr
         JOIN employee e ON e.id = lr.employee_id
@@ -373,6 +441,8 @@ def review_leave(request_id):
         conn.close()
 
         flash(f"Leave request {action.lower()}.")
+        if user["role"] == "admin":
+            return redirect(url_for("admin_leave_requests"))
         return redirect(url_for("dashboard"))
 
     cur.close()
