@@ -4,7 +4,7 @@
 
 <h2>Admin - All Leave Requests</h2>
 
-<form method="get" action="{{ url_for('admin_leave_requests') }}" class="filters">
+<form method="get" action="{{ url_for('admin_leave_requests') }}" class="filters admin-filters">
     <div>
         <label>Start Date</label>
         <input type="date" name="start_date" value="{{ filter_start }}">

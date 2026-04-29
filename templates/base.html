@@ -211,6 +211,21 @@
             flex-wrap: wrap;
         }
 
+        .admin-filters {
+            grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(220px, 1fr) minmax(150px, 1fr) auto;
+            align-items: end;
+        }
+
+        .admin-filters .filter-actions {
+            justify-content: flex-end;
+            white-space: nowrap;
+        }
+
+        .admin-filters .filter-actions .button,
+        .admin-filters .filter-actions button {
+            margin: 0;
+        }
+
         .actions form {
             display: inline;
         }
@@ -227,7 +242,8 @@
 
         @media (max-width: 800px) {
             .topbar { display: block; text-align: center; line-height: 1.8; }
-            .filters { grid-template-columns: 1fr; }
+            .filters, .admin-filters { grid-template-columns: 1fr; }
+            .admin-filters .filter-actions { justify-content: flex-start; white-space: normal; }
             table { display: block; overflow-x: auto; }
         }
     </style>
