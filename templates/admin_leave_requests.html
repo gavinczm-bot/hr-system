@@ -43,10 +43,11 @@
     </div>
 </form>
 
-<table>
+<table class="mobile-cards">
     <tr>
         <th>ID</th>
         <th>Employee</th>
+        <th>Department</th>
         <th>Type</th>
         <th>Start</th>
         <th>Finish</th>
@@ -62,19 +63,20 @@
 
     {% for r in all_requests %}
     <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.employee_name }}</td>
-        <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
-        <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
-        <td>{{ r.reason or '' }}</td>
-        <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
-        <td><span class="status">{{ r.status }}</span></td>
-        <td>{{ r.submitted_at }}</td>
-        <td>{{ r.reviewer_name or '' }}</td>
-        <td>{{ r.reviewed_at or '' }}</td>
-        <td>{{ r.review_comment or '' }}</td>
-        <td class="actions">
+        <td data-label="ID">{{ r.id }}</td>
+        <td data-label="Employee">{{ r.employee_name }}</td>
+        <td data-label="Department">{{ r.department or '' }}</td>
+        <td data-label="Type">{{ r.leave_type }}</td>
+        <td data-label="Start">{{ r.start_date }} {{ r.start_time or '' }}</td>
+        <td data-label="Finish">{{ r.end_date }} {{ r.end_time or '' }}</td>
+        <td data-label="Reason">{{ r.reason or '' }}</td>
+        <td data-label="Attachment">{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
+        <td data-label="Status"><span class="status">{{ r.status }}</span></td>
+        <td data-label="Submitted">{{ r.submitted_at }}</td>
+        <td data-label="Reviewed By">{{ r.reviewer_name or '' }}</td>
+        <td data-label="Reviewed At">{{ r.reviewed_at or '' }}</td>
+        <td data-label="Review Comment">{{ r.review_comment or '' }}</td>
+        <td class="actions" data-label="Action">
             <a href="{{ url_for('view_leave', request_id=r.id) }}">View</a>
             {% if r.status == 'Pending' %}
                 | <a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a>
@@ -83,7 +85,7 @@
     </tr>
     {% else %}
     <tr>
-        <td colspan="13">No leave requests found.</td>
+        <td colspan="14">No leave requests found.</td>
     </tr>
     {% endfor %}
 </table>

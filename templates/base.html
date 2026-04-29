@@ -67,7 +67,7 @@
         }
 
         .container {
-            max-width: 1320px;
+            max-width: 1260px;
             margin: 28px auto;
             padding: 0 24px 40px 24px;
         }
@@ -212,18 +212,13 @@
         }
 
         .admin-filters {
-            grid-template-columns: 180px 180px minmax(220px, 1fr) 180px auto;
+            grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(220px, 1fr) minmax(150px, 1fr) auto;
             align-items: end;
         }
 
         .admin-filters .filter-actions {
-            justify-content: flex-start;
+            justify-content: flex-end;
             white-space: nowrap;
-        }
-
-        .admin-filters input,
-        .admin-filters select {
-            max-width: none;
         }
 
         .admin-filters .filter-actions .button,
@@ -246,10 +241,137 @@
         }
 
         @media (max-width: 800px) {
-            .topbar { display: block; text-align: center; line-height: 1.8; }
-            .filters, .admin-filters { grid-template-columns: 1fr; }
-            .admin-filters .filter-actions { justify-content: flex-start; white-space: normal; }
-            table { display: block; overflow-x: auto; }
+            body { background: #fff; }
+
+            .topbar {
+                display: block;
+                text-align: center;
+                line-height: 1.7;
+                padding: 9px 12px;
+                font-size: 12px;
+            }
+
+            .nav {
+                padding: 10px 10px;
+                text-align: left;
+                overflow-x: auto;
+                white-space: nowrap;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .nav a {
+                margin: 4px 4px;
+                padding: 8px 10px;
+                border: 1px solid var(--bio-border);
+                border-radius: 999px;
+                background: #fff;
+                font-size: 11px;
+                letter-spacing: 0.8px;
+            }
+
+            .userline {
+                white-space: normal;
+                line-height: 1.4;
+                margin: 0 0 8px 0;
+                font-size: 12px;
+            }
+
+            .container {
+                width: 100%;
+                margin: 0;
+                padding: 10px 10px 24px 10px;
+            }
+
+            .card {
+                border: none;
+                border-radius: 0;
+                padding: 14px 8px;
+                box-shadow: none;
+            }
+
+            h2 {
+                font-size: 21px;
+                line-height: 1.25;
+                margin-bottom: 18px;
+            }
+
+            h3 { font-size: 16px; }
+
+            .filters,
+            .admin-filters {
+                display: grid;
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .admin-filters .filter-actions,
+            .filters .filter-actions {
+                justify-content: flex-start;
+                white-space: normal;
+                gap: 8px;
+            }
+
+            input,
+            select,
+            textarea {
+                max-width: none;
+                width: 100%;
+                font-size: 16px;
+            }
+
+            button,
+            .button {
+                min-height: 40px;
+                padding: 10px 14px;
+                font-size: 11px;
+            }
+
+            table.mobile-cards {
+                border: none;
+                background: transparent;
+                display: block;
+            }
+
+            table.mobile-cards tbody,
+            table.mobile-cards tr,
+            table.mobile-cards td {
+                display: block;
+                width: 100%;
+            }
+
+            table.mobile-cards tr:first-child { display: none; }
+
+            table.mobile-cards tr {
+                background: #fff;
+                border: 1px solid var(--bio-border);
+                border-radius: 10px;
+                margin: 0 0 12px 0;
+                padding: 10px 12px;
+                box-shadow: 0 4px 12px rgba(47, 49, 59, 0.05);
+            }
+
+            table.mobile-cards td {
+                border: none;
+                border-bottom: 1px solid #f0f1f2;
+                padding: 8px 0;
+                font-size: 14px;
+            }
+
+            table.mobile-cards td:last-child { border-bottom: none; }
+
+            table.mobile-cards td::before {
+                content: attr(data-label);
+                display: block;
+                color: var(--bio-grey);
+                font-size: 11px;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.8px;
+                margin-bottom: 3px;
+            }
+
+            table.mobile-cards td.actions a,
+            table.mobile-cards td.actions button { margin: 3px 4px 3px 0; }
         }
     </style>
 </head>

@@ -16,7 +16,7 @@
 
 <h3>Requests Waiting For My Approval</h3>
 
-<table>
+<table class="mobile-cards">
     <tr>
         <th>ID</th>
         <th>Employee</th>
@@ -31,15 +31,15 @@
 
     {% for r in approval_requests %}
     <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.employee_name }}</td>
-        <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
-        <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
-        <td>{{ r.reason }}</td>
-        <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
-        <td>{{ r.status }}</td>
-        <td>
+        <td data-label="ID">{{ r.id }}</td>
+        <td data-label="Employee">{{ r.employee_name }}</td>
+        <td data-label="Type">{{ r.leave_type }}</td>
+        <td data-label="Start">{{ r.start_date }} {{ r.start_time or '' }}</td>
+        <td data-label="Finish">{{ r.end_date }} {{ r.end_time or '' }}</td>
+        <td data-label="Reason">{{ r.reason }}</td>
+        <td data-label="Attachment">{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
+        <td data-label="Status">{{ r.status }}</td>
+        <td data-label="Action">
             <a href="{{ url_for('view_leave', request_id=r.id) }}">View</a>
             {% if r.status == 'Pending' %}
                 | <a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a>
@@ -56,7 +56,7 @@
 
 <h3>My Leave Requests</h3>
 
-<table>
+<table class="mobile-cards">
     <tr>
         <th>ID</th>
         <th>Type</th>
@@ -72,16 +72,16 @@
 
     {% for r in my_requests %}
     <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.leave_type }}</td>
-        <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
-        <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
-        <td>{{ r.reason }}</td>
-        <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
-        <td>{{ r.status }}</td>
-        <td>{{ r.submitted_at }}</td>
-        <td>{{ r.review_comment or '' }}</td>
-        <td>
+        <td data-label="ID">{{ r.id }}</td>
+        <td data-label="Type">{{ r.leave_type }}</td>
+        <td data-label="Start">{{ r.start_date }} {{ r.start_time or '' }}</td>
+        <td data-label="Finish">{{ r.end_date }} {{ r.end_time or '' }}</td>
+        <td data-label="Reason">{{ r.reason }}</td>
+        <td data-label="Attachment">{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
+        <td data-label="Status">{{ r.status }}</td>
+        <td data-label="Submitted">{{ r.submitted_at }}</td>
+        <td data-label="Review Comment">{{ r.review_comment or '' }}</td>
+        <td data-label="Action">
             <a href="{{ url_for('view_leave', request_id=r.id) }}">View</a>
             {% if r.status != 'Cancelled' %}
                 | <a href="{{ url_for('edit_leave', request_id=r.id) }}">Edit</a>
