@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>My Leave Requests</h2>
+
+<form method="get" action="{{ url_for('employee_leave_requests') }}" class="filters">
+    <div>
+        <label>Start Date</label>
+        <input type="date" name="start_date" value="{{ filter_start }}">
+    </div>
+
+    <div>
+        <label>End Date</label>
+        <input type="date" name="end_date" value="{{ filter_end }}">
+    </div>
+
+    <div>
+        <label>Status</label>
+        <select name="status">
+            <option value="" {% if not filter_status %}selected{% endif %}>All</option>
+            <option value="Pending" {% if filter_status == 'Pending' %}selected{% endif %}>Pending</option>
+            <option value="Approved" {% if filter_status == 'Approved' %}selected{% endif %}>Approved</option>
+            <option value="Denied" {% if filter_status == 'Denied' %}selected{% endif %}>Denied</option>
+            <option value="Cancelled" {% if filter_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+    </div>
+
+    <div>
+        <button type="submit">Filter</button>
+        <a href="{{ url_for('employee_leave_requests') }}" class="button secondary">Clear</a>
+    </div>
+</form>
+
+<table>
+    <tr>
+        <th>ID</th>
+        <th>Scope</th>
+        <th>Employee</th>
+        <th>Department</th>
+        <th>Type</th>
+        <th>Start</th>
+        <th>Finish</th>
+        <th>Reason</th>
+        <th>Attachment</th>
+        <th>Status</th>
+        <th>Submitted</th>
+        <th>Review Comment</th>
+        <th>Action</th>
+    </tr>
+
+    {% for r in leave_requests %}
+    <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.request_scope }}</td>
+        <td>{{ r.employee_name }}</td>
+        <td>{{ r.department or '' }}</td>
+        <td>{{ r.leave_type }}</td>
+        <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
+        <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
+        <td>{{ r.reason or '' }}</td>
+        <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
+        <td><span class="status">{{ r.status }}</span></td>
+        <td>{{ r.submitted_at }}</td>
+        <td>{{ r.review_comment or '' }}</td>
+        <td class="actions">
+            <a href="{{ url_for('view_leave', request_id=r.id) }}">View</a>
+
+            {% if r.request_scope == 'Mine' and r.status != 'Cancelled' %}
+                | <a href="{{ url_for('edit_leave', request_id=r.id) }}">Edit</a>
+                | <form method="post" action="{{ url_for('cancel_leave', request_id=r.id) }}" onsubmit="return confirm('Cancel this leave request?');">
+                    <button type="submit">Cancel</button>
+                </form>
+            {% endif %}
+
+            {% if r.request_scope == 'Supervised' and r.status == 'Pending' %}
+                | <a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a>
+            {% endif %}
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="13">No leave requests found.</td>
+    </tr>
+    {% endfor %}
+</table>
+
+{% endblock %}

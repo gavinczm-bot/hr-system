@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>My Profile</h2>
+
+<form method="post">
+    <label>Name</label>
+    <input type="text" value="{{ user.employee_name or user.username }}" disabled>
+    <br><br>
+
+    <label>Username</label>
+    <input type="text" value="{{ user.username }}" disabled>
+    <br><br>
+
+    <label>Email</label>
+    <input type="email" name="email" value="{{ user.employee_email or '' }}">
+    <br><br>
+
+    <h3>Change Password</h3>
+    <p>Leave password fields blank if you only want to update email.</p>
+
+    <label>Current Password</label>
+    <input type="password" name="current_password">
+    <br><br>
+
+    <label>New Password</label>
+    <input type="password" name="new_password">
+    <br><br>
+
+    <label>Confirm New Password</label>
+    <input type="password" name="confirm_password">
+    <br><br>
+
+    <button type="submit">Save Profile</button>
+</form>
+
+{% endblock %}

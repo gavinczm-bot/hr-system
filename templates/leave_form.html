@@ -18,6 +18,8 @@
         <option value="Sick Leave" {% if leave and leave.leave_type == 'Sick Leave' %}selected{% endif %}>Sick Leave</option>
         <option value="Personal Leave" {% if leave and leave.leave_type == 'Personal Leave' %}selected{% endif %}>Personal Leave</option>
         <option value="Unpaid Leave" {% if leave and leave.leave_type == 'Unpaid Leave' %}selected{% endif %}>Unpaid Leave</option>
+        <option value="LSL" {% if leave and leave.leave_type == 'LSL' %}selected{% endif %}>LSL</option>
+        <option value="DIL" {% if leave and leave.leave_type == 'DIL' %}selected{% endif %}>DIL</option>
     </select>
     <br><br>
 

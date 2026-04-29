@@ -3,58 +3,280 @@
 <head>
     <title>HR Leave System</title>
     <style>
+        :root {
+            --bio-navy: #2f313b;
+            --bio-coral: #f47f72;
+            --bio-coral-dark: #e5675a;
+            --bio-green: #82c69a;
+            --bio-mint: #eef8f2;
+            --bio-grey: #8b8f96;
+            --bio-light: #f7f8f9;
+            --bio-border: #e3e6e8;
+            --bio-text: #20242a;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 30px;
+            font-family: Arial, Helvetica, sans-serif;
+            margin: 0;
+            background: var(--bio-light);
+            color: var(--bio-text);
+        }
+
+        .topbar {
+            background: var(--bio-navy);
+            color: #fff;
+            padding: 10px 28px;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-transform: uppercase;
+        }
+
+        .brandbar {
+            background: #fff;
+            padding: 26px 30px 20px 30px;
+            text-align: center;
+            border-bottom: 1px solid var(--bio-border);
+        }
+
+        .brand {
+            font-size: 52px;
+            letter-spacing: 7px;
+            font-weight: 300;
+            color: #8c9093;
+            line-height: 1;
+        }
+
+        .brand .green {
+            color: var(--bio-green);
+        }
+
+        .subtitle {
+            margin-top: 10px;
+            color: var(--bio-coral);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-size: 14px;
+        }
+
+        .nav {
+            background: #fff;
+            padding: 12px 30px;
+            text-align: center;
+            border-bottom: 1px solid var(--bio-border);
+        }
+
+        .nav a {
+            display: inline-block;
+            color: var(--bio-navy);
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 1.6px;
+            font-size: 13px;
+            margin: 6px 12px;
+            padding: 8px 4px;
+        }
+
+        .nav a:hover {
+            color: var(--bio-coral);
+        }
+
+        .userline {
+            color: var(--bio-grey);
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .container {
+            max-width: 1260px;
+            margin: 28px auto;
+            padding: 0 24px 40px 24px;
+        }
+
+        .card {
+            background: #fff;
+            border: 1px solid var(--bio-border);
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 18px rgba(47, 49, 59, 0.05);
+        }
+
+        h1, h2, h3 {
+            font-weight: 400;
+            letter-spacing: 1.5px;
+            color: var(--bio-navy);
+        }
+
+        h2 {
+            color: var(--bio-coral);
+            text-transform: uppercase;
+            font-size: 28px;
+            text-align: center;
+            margin-top: 0;
+        }
+
+        h3 {
+            font-size: 19px;
+            text-transform: uppercase;
+            margin-top: 8px;
         }
 
         table {
             border-collapse: collapse;
             width: 100%;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            background: #fff;
+            border: 1px solid var(--bio-border);
         }
 
         th, td {
-            border: 1px solid #ccc;
-            padding: 8px;
+            border-bottom: 1px solid var(--bio-border);
+            padding: 11px 10px;
+            text-align: left;
+            vertical-align: top;
+            font-size: 14px;
         }
 
         th {
-            background: #f2f2f2;
+            background: var(--bio-mint);
+            color: var(--bio-navy);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: 1px;
         }
 
-        .nav {
-            margin-bottom: 20px;
+        tr:hover td {
+            background: #fffafa;
         }
 
-        .nav a {
-            margin-right: 15px;
+        a {
+            color: var(--bio-coral-dark);
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            max-width: 520px;
+            padding: 10px 12px;
+            border: 1px solid #cfd4d7;
+            border-radius: 6px;
+            font-size: 14px;
+            background: #fff;
+        }
+
+        textarea {
+            max-width: 720px;
+        }
+
+        label, .field-label {
+            font-weight: 600;
+            color: var(--bio-navy);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        button, .button {
+            display: inline-block;
+            width: auto;
+            border: none;
+            background: var(--bio-coral);
+            color: #fff !important;
+            border-radius: 24px;
+            padding: 10px 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 12px;
+            cursor: pointer;
+            text-decoration: none !important;
+        }
+
+        button:hover, .button:hover {
+            background: var(--bio-coral-dark);
+        }
+
+        .button.secondary {
+            background: var(--bio-navy);
         }
 
         .flash {
-            background: #fff3cd;
-            padding: 10px;
-            border: 1px solid #ffeeba;
-            margin-bottom: 15px;
+            background: #fff6e6;
+            padding: 12px 15px;
+            border-left: 5px solid var(--bio-coral);
+            margin-bottom: 16px;
+            border-radius: 6px;
+        }
+
+        .filters {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            align-items: end;
+            margin-bottom: 18px;
+        }
+
+        .filters div {
+            min-width: 170px;
+        }
+
+        .actions form {
+            display: inline;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 9px;
+            border-radius: 99px;
+            background: var(--bio-mint);
+            color: var(--bio-navy);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        @media (max-width: 800px) {
+            .brand { font-size: 36px; letter-spacing: 4px; }
+            .topbar { display: block; text-align: center; line-height: 1.8; }
+            table { display: block; overflow-x: auto; }
         }
     </style>
 </head>
 <body>
 
-<h1>HR Leave System</h1>
+<div class="topbar">
+    <div>HR Leave System</div>
+    <div>Bio Living Team Portal</div>
+</div>
+
+<div class="brandbar">
+    <div class="brand">BIO<span class="green">LIVING</span></div>
+    <div class="subtitle">Leave Management</div>
+    {% if current_user %}
+        <div class="userline">
+            Logged in as <b>{{ current_user.username }}</b>
+            {% if current_user.employee_name %} - {{ current_user.employee_name }}{% endif %}
+            - Role: {{ current_user.role }}
+        </div>
+    {% endif %}
+</div>
 
 {% if current_user %}
 <div class="nav">
-    Logged in as: <b>{{ current_user.username }}</b>
-    {% if current_user.employee_name %}
-        - {{ current_user.employee_name }}
-    {% endif %}
-    - Role: {{ current_user.role }}
-
-    <br><br>
-
     <a href="{{ url_for('dashboard') }}">Dashboard</a>
+    <a href="{{ url_for('employee_leave_requests') }}">My Leave Requests</a>
     <a href="{{ url_for('new_leave') }}">Submit Leave</a>
+    <a href="{{ url_for('profile') }}">Profile</a>
 
     {% if current_user.role == 'admin' %}
         <a href="{{ url_for('admin_employees') }}">Admin Employees</a>
@@ -65,17 +287,19 @@
 </div>
 {% endif %}
 
-{% with messages = get_flashed_messages() %}
-    {% if messages %}
-        {% for msg in messages %}
-            <div class="flash">{{ msg }}</div>
-        {% endfor %}
-    {% endif %}
-{% endwith %}
+<div class="container">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="flash">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-<hr>
-
-{% block content %}{% endblock %}
+    <div class="card">
+        {% block content %}{% endblock %}
+    </div>
+</div>
 
 </body>
 </html>

@@ -408,6 +408,46 @@ def build_admin_leave_request_query(filter_start, filter_end, filter_status, inc
     return sql, params
 
 
+def build_employee_leave_request_query(employee_id, filter_start, filter_end, filter_status):
+    sql = """
+        SELECT
+            lr.*,
+            e.name AS employee_name,
+            e.email AS employee_email,
+            e.department,
+            reviewer.username AS reviewer_name,
+            (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count,
+            CASE
+                WHEN lr.employee_id = %s THEN 'Mine'
+                ELSE 'Supervised'
+            END AS request_scope
+        FROM leave_requests lr
+        JOIN employee e ON e.id = lr.employee_id
+        LEFT JOIN users reviewer ON reviewer.id = lr.reviewed_by
+        WHERE (lr.employee_id = %s OR e.supervisor_id = %s)
+    """
+
+    params = [employee_id, employee_id, employee_id]
+
+    if filter_start:
+        sql += " AND lr.end_date >= %s "
+        params.append(filter_start)
+
+    if filter_end:
+        sql += " AND lr.start_date <= %s "
+        params.append(filter_end)
+
+    if filter_status:
+        sql += " AND lr.status = %s "
+        params.append(filter_status)
+
+    sql += """
+        ORDER BY lr.start_date DESC, lr.submitted_at DESC
+    """
+
+    return sql, params
+
+
 # ---------------- AUTH ----------------
 def current_user():
     if "user_id" not in session:
@@ -556,6 +596,109 @@ def dashboard():
         my_requests=my_requests,
         approval_requests=approval_requests
     )
+
+
+# ---------------- EMPLOYEE LEAVE REQUESTS ----------------
+@app.route("/my/leave-requests")
+@login_required
+def employee_leave_requests():
+    user = current_user()
+
+    if not user["employee_id"]:
+        flash("Admin account is not linked to an employee.")
+        return redirect(url_for("dashboard"))
+
+    filter_start = request.args.get("start_date", "").strip()
+    filter_end = request.args.get("end_date", "").strip()
+    filter_status = request.args.get("status", "").strip()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    sql, params = build_employee_leave_request_query(
+        user["employee_id"],
+        filter_start,
+        filter_end,
+        filter_status
+    )
+
+    cur.execute(sql, params)
+    leave_requests = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return render_template(
+        "employee_leave_requests.html",
+        leave_requests=leave_requests,
+        filter_start=filter_start,
+        filter_end=filter_end,
+        filter_status=filter_status
+    )
+
+
+@app.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    user = current_user()
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        current_password = request.form.get("current_password", "")
+        new_password = request.form.get("new_password", "")
+        confirm_password = request.form.get("confirm_password", "")
+
+        conn = get_db()
+        cur = conn.cursor()
+
+        try:
+            if user["employee_id"]:
+                cur.execute("""
+                    UPDATE employee
+                    SET email = %s
+                    WHERE id = %s
+                """, (email, user["employee_id"]))
+
+            if new_password or confirm_password or current_password:
+                if not current_password:
+                    raise Exception("Current password is required to change password.")
+
+                if new_password != confirm_password:
+                    raise Exception("New password and confirm password do not match.")
+
+                if len(new_password) < 6:
+                    raise Exception("New password must be at least 6 characters.")
+
+                cur.execute("""
+                    SELECT password
+                    FROM users
+                    WHERE id = %s
+                """, (user["id"],))
+
+                existing = cur.fetchone()
+
+                if not existing or existing["password"] != current_password:
+                    raise Exception("Current password is incorrect.")
+
+                cur.execute("""
+                    UPDATE users
+                    SET password = %s
+                    WHERE id = %s
+                """, (new_password, user["id"]))
+
+            conn.commit()
+            flash("Profile updated.")
+
+        except Exception as e:
+            conn.rollback()
+            flash("Error updating profile: " + str(e))
+
+        cur.close()
+        conn.close()
+
+        return redirect(url_for("profile"))
+
+    return render_template("profile.html", user=user)
 
 
 # ---------------- ADMIN LEAVE REQUESTS ----------------

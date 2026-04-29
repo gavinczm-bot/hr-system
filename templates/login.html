@@ -2,28 +2,49 @@
 <html>
 <head>
     <title>Login - HR Leave System</title>
+    <style>
+        :root { --bio-navy:#2f313b; --bio-coral:#f47f72; --bio-green:#82c69a; --bio-border:#e3e6e8; }
+        body { margin:0; font-family:Arial, Helvetica, sans-serif; background:#f7f8f9; color:#20242a; }
+        .topbar { background:var(--bio-navy); color:#fff; padding:10px 28px; text-transform:uppercase; letter-spacing:.5px; font-size:13px; display:flex; justify-content:space-between; }
+        .brandbar { background:#fff; padding:36px 30px 26px; text-align:center; border-bottom:1px solid var(--bio-border); }
+        .brand { font-size:52px; letter-spacing:7px; font-weight:300; color:#8c9093; line-height:1; }
+        .brand .green { color:var(--bio-green); }
+        .subtitle { margin-top:10px; color:var(--bio-coral); letter-spacing:3px; text-transform:uppercase; font-size:14px; }
+        .login-card { width:380px; max-width:calc(100% - 40px); margin:42px auto; background:#fff; padding:28px; border-radius:10px; border:1px solid var(--bio-border); box-shadow:0 8px 18px rgba(47,49,59,.05); }
+        h2 { color:var(--bio-coral); text-transform:uppercase; letter-spacing:1.5px; text-align:center; font-weight:400; }
+        input { width:100%; box-sizing:border-box; padding:11px 12px; border:1px solid #cfd4d7; border-radius:6px; font-size:14px; }
+        label { font-weight:600; display:block; margin-bottom:6px; color:var(--bio-navy); }
+        button { border:none; background:var(--bio-coral); color:#fff; border-radius:24px; padding:11px 20px; font-weight:700; text-transform:uppercase; letter-spacing:1px; cursor:pointer; width:100%; }
+        .flash { background:#fff6e6; padding:12px 15px; border-left:5px solid var(--bio-coral); margin-bottom:16px; border-radius:6px; }
+    </style>
 </head>
 <body>
+<div class="topbar"><div>HR Leave System</div><div>Bio Living Team Portal</div></div>
+<div class="brandbar">
+    <div class="brand">BIO<span class="green">LIVING</span></div>
+    <div class="subtitle">Leave Management</div>
+</div>
 
-<h2>Login</h2>
+<div class="login-card">
+    <h2>Login</h2>
 
-{% with messages = get_flashed_messages() %}
-    {% if messages %}
-        {% for msg in messages %}
-            <p style="color:red;">{{ msg }}</p>
-        {% endfor %}
-    {% endif %}
-{% endwith %}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for msg in messages %}
+                <div class="flash">{{ msg }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
 
-<form method="post">
-    Username:<br>
-    <input type="text" name="username" required><br><br>
+    <form method="post">
+        <label>Username</label>
+        <input type="text" name="username" required><br><br>
 
-    Password:<br>
-    <input type="password" name="password" required><br><br>
+        <label>Password</label>
+        <input type="password" name="password" required><br><br>
 
-    <button type="submit">Login</button>
-</form>
-
+        <button type="submit">Login</button>
+    </form>
+</div>
 </body>
 </html>
