@@ -4,6 +4,7 @@ import io
 import csv
 import zipfile
 import smtplib
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from html import escape
@@ -163,25 +164,33 @@ def build_absolute_url(endpoint, **values):
     return url_for(endpoint, _external=True, **values)
 
 
-def send_html_email(to_addresses, subject, html_body):
-    if isinstance(to_addresses, str):
-        to_addresses = [to_addresses]
+def email_enabled():
+    return os.environ.get("EMAIL_ENABLED", "true").strip().lower() not in ["0", "false", "no", "off"]
 
-    recipients = []
-    for addr in to_addresses or []:
-        addr = (addr or "").strip()
-        if addr and addr not in recipients:
-            recipients.append(addr)
 
-    if not recipients:
-        return False
+def smtp_timeout_seconds():
+    try:
+        timeout = int(os.environ.get("SMTP_TIMEOUT", "5"))
+    except Exception:
+        timeout = 5
 
+    if timeout < 1:
+        timeout = 1
+
+    if timeout > 10:
+        timeout = 10
+
+    return timeout
+
+
+def _send_html_email_now(recipients, subject, html_body):
     smtp_host = os.environ.get("SMTP_HOST", "").strip()
     smtp_port = int(os.environ.get("SMTP_PORT", "587"))
     smtp_username = os.environ.get("SMTP_USERNAME", "").strip()
     smtp_password = os.environ.get("SMTP_PASSWORD", "")
     from_email = os.environ.get("SMTP_FROM_EMAIL", "").strip()
     from_name = os.environ.get("SMTP_FROM_NAME", "HR Leave System").strip()
+    timeout = smtp_timeout_seconds()
 
     if not smtp_host or not from_email:
         print("Email skipped: SMTP_HOST or SMTP_FROM_EMAIL is missing.")
@@ -194,7 +203,9 @@ def send_html_email(to_addresses, subject, html_body):
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(smtp_host, smtp_port, timeout=30) as smtp:
+        print(f"Sending email via {smtp_host}:{smtp_port}, timeout={timeout}s, recipients={len(recipients)}")
+
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=timeout) as smtp:
             if smtp_use_tls():
                 smtp.starttls()
 
@@ -203,11 +214,45 @@ def send_html_email(to_addresses, subject, html_body):
 
             smtp.sendmail(from_email, recipients, msg.as_string())
 
+        print("Email sent successfully.")
         return True
 
     except Exception as e:
-        print("Email send failed: " + str(e))
+        print("Email send failed: " + repr(e))
         return False
+
+
+def send_html_email(to_addresses, subject, html_body):
+    if not email_enabled():
+        print("Email skipped: EMAIL_ENABLED is false.")
+        return False
+
+    if isinstance(to_addresses, str):
+        to_addresses = [to_addresses]
+
+    recipients = []
+    for addr in to_addresses or []:
+        addr = (addr or "").strip()
+        if addr and addr not in recipients:
+            recipients.append(addr)
+
+    if not recipients:
+        print("Email skipped: no recipients.")
+        return False
+
+    async_email = os.environ.get("EMAIL_ASYNC", "true").strip().lower() not in ["0", "false", "no", "off"]
+
+    if async_email:
+        thread = threading.Thread(
+            target=_send_html_email_now,
+            args=(recipients, subject, html_body),
+            daemon=True
+        )
+        thread.start()
+        print("Email queued in background thread.")
+        return True
+
+    return _send_html_email_now(recipients, subject, html_body)
 
 
 def get_leave_email_context(cur, leave_request_id):
