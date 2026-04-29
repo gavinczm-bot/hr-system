@@ -47,7 +47,6 @@
     <tr>
         <th>ID</th>
         <th>Employee</th>
-        <th>Department</th>
         <th>Type</th>
         <th>Start</th>
         <th>Finish</th>
@@ -65,7 +64,6 @@
     <tr>
         <td>{{ r.id }}</td>
         <td>{{ r.employee_name }}</td>
-        <td>{{ r.department or '' }}</td>
         <td>{{ r.leave_type }}</td>
         <td>{{ r.start_date }} {{ r.start_time or '' }}</td>
         <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
@@ -85,7 +83,7 @@
     </tr>
     {% else %}
     <tr>
-        <td colspan="14">No leave requests found.</td>
+        <td colspan="13">No leave requests found.</td>
     </tr>
     {% endfor %}
 </table>

@@ -67,7 +67,7 @@
         }
 
         .container {
-            max-width: 1260px;
+            max-width: 1320px;
             margin: 28px auto;
             padding: 0 24px 40px 24px;
         }
@@ -212,13 +212,18 @@
         }
 
         .admin-filters {
-            grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) minmax(220px, 1fr) minmax(150px, 1fr) auto;
+            grid-template-columns: 180px 180px minmax(220px, 1fr) 180px auto;
             align-items: end;
         }
 
         .admin-filters .filter-actions {
-            justify-content: flex-end;
+            justify-content: flex-start;
             white-space: nowrap;
+        }
+
+        .admin-filters input,
+        .admin-filters select {
+            max-width: none;
         }
 
         .admin-filters .filter-actions .button,
