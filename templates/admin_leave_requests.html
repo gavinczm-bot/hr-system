@@ -11,6 +11,14 @@
     End Date:
     <input type="date" name="end_date" value="{{ filter_end }}">
 
+    Employee:
+    <select name="employee_id">
+        <option value="" {% if not filter_employee_id %}selected{% endif %}>All</option>
+        {% for e in employees %}
+            <option value="{{ e.id }}" {% if filter_employee_id|string == e.id|string %}selected{% endif %}>{{ e.name }}</option>
+        {% endfor %}
+    </select>
+
     Status:
     <select name="status">
         <option value="" {% if not filter_status %}selected{% endif %}>All</option>
@@ -22,7 +30,7 @@
 
     <button type="submit">Filter</button>
     <a href="{{ url_for('admin_leave_requests') }}">Clear</a>
-    <a href="{{ url_for('export_admin_leave_requests', start_date=filter_start, end_date=filter_end, status=filter_status) }}">
+    <a href="{{ url_for('export_admin_leave_requests', start_date=filter_start, end_date=filter_end, status=filter_status, employee_id=filter_employee_id) }}">
         <button type="button">Export Filtered</button>
     </a>
 </form>

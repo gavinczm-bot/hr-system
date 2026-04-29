@@ -359,7 +359,7 @@ def notify_leave_reviewed(leave):
         "Your leave request has been reviewed."
     )
     return send_html_email(leave.get("employee_email"), subject, body)
-def build_admin_leave_request_query(filter_start, filter_end, filter_status, include_attachment_list=False):
+def build_admin_leave_request_query(filter_start, filter_end, filter_status, filter_employee_id=None, include_attachment_list=False):
     attachment_select = """
             (SELECT COUNT(*) FROM leave_attachments la WHERE la.leave_request_id = lr.id) AS attachment_count
     """
@@ -401,6 +401,10 @@ def build_admin_leave_request_query(filter_start, filter_end, filter_status, inc
         sql += " AND lr.status = %s "
         params.append(filter_status)
 
+    if filter_employee_id:
+        sql += " AND e.id = %s "
+        params.append(filter_employee_id)
+
     sql += """
         ORDER BY lr.start_date DESC, lr.submitted_at DESC
     """
@@ -408,7 +412,7 @@ def build_admin_leave_request_query(filter_start, filter_end, filter_status, inc
     return sql, params
 
 
-def build_employee_leave_request_query(employee_id, filter_start, filter_end, filter_status):
+def build_employee_leave_request_query(employee_id, filter_start, filter_end, filter_status, filter_employee_id=None):
     sql = """
         SELECT
             lr.*,
@@ -440,6 +444,10 @@ def build_employee_leave_request_query(employee_id, filter_start, filter_end, fi
     if filter_status:
         sql += " AND lr.status = %s "
         params.append(filter_status)
+
+    if filter_employee_id:
+        sql += " AND e.id = %s "
+        params.append(filter_employee_id)
 
     sql += """
         ORDER BY lr.start_date DESC, lr.submitted_at DESC
@@ -611,6 +619,7 @@ def employee_leave_requests():
     filter_start = request.args.get("start_date", "").strip()
     filter_end = request.args.get("end_date", "").strip()
     filter_status = request.args.get("status", "").strip()
+    filter_employee_id = request.args.get("employee_id", "").strip()
 
     conn = get_db()
     cur = conn.cursor()
@@ -619,11 +628,20 @@ def employee_leave_requests():
         user["employee_id"],
         filter_start,
         filter_end,
-        filter_status
+        filter_status,
+        filter_employee_id
     )
 
     cur.execute(sql, params)
     leave_requests = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, name
+        FROM employee
+        WHERE id = %s OR supervisor_id = %s
+        ORDER BY name
+    """, (user["employee_id"], user["employee_id"]))
+    employees = cur.fetchall()
 
     cur.close()
     conn.close()
@@ -631,9 +649,11 @@ def employee_leave_requests():
     return render_template(
         "employee_leave_requests.html",
         leave_requests=leave_requests,
+        employees=employees,
         filter_start=filter_start,
         filter_end=filter_end,
-        filter_status=filter_status
+        filter_status=filter_status,
+        filter_employee_id=filter_employee_id
     )
 
 
@@ -709,6 +729,7 @@ def admin_leave_requests():
     filter_start = request.args.get("start_date", "").strip()
     filter_end = request.args.get("end_date", "").strip()
     filter_status = request.args.get("status", "").strip()
+    filter_employee_id = request.args.get("employee_id", "").strip()
 
     conn = get_db()
     cur = conn.cursor()
@@ -716,11 +737,19 @@ def admin_leave_requests():
     sql, params = build_admin_leave_request_query(
         filter_start,
         filter_end,
-        filter_status
+        filter_status,
+        filter_employee_id
     )
 
     cur.execute(sql, params)
     all_requests = cur.fetchall()
+
+    cur.execute("""
+        SELECT id, name
+        FROM employee
+        ORDER BY name
+    """)
+    employees = cur.fetchall()
 
     cur.close()
     conn.close()
@@ -728,9 +757,11 @@ def admin_leave_requests():
     return render_template(
         "admin_leave_requests.html",
         all_requests=all_requests,
+        employees=employees,
         filter_start=filter_start,
         filter_end=filter_end,
-        filter_status=filter_status
+        filter_status=filter_status,
+        filter_employee_id=filter_employee_id
     )
 
 
@@ -741,6 +772,7 @@ def export_admin_leave_requests():
     filter_start = request.args.get("start_date", "").strip()
     filter_end = request.args.get("end_date", "").strip()
     filter_status = request.args.get("status", "").strip()
+    filter_employee_id = request.args.get("employee_id", "").strip()
 
     conn = get_db()
     cur = conn.cursor()
@@ -749,6 +781,7 @@ def export_admin_leave_requests():
         filter_start,
         filter_end,
         filter_status,
+        filter_employee_id,
         include_attachment_list=True
     )
 

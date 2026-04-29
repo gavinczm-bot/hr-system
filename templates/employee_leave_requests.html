@@ -16,6 +16,16 @@
     </div>
 
     <div>
+        <label>Employee</label>
+        <select name="employee_id">
+            <option value="" {% if not filter_employee_id %}selected{% endif %}>All</option>
+            {% for e in employees %}
+                <option value="{{ e.id }}" {% if filter_employee_id|string == e.id|string %}selected{% endif %}>{{ e.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
         <label>Status</label>
         <select name="status">
             <option value="" {% if not filter_status %}selected{% endif %}>All</option>
