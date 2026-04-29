@@ -5,34 +5,42 @@
 <h2>Admin - All Leave Requests</h2>
 
 <form method="get" action="{{ url_for('admin_leave_requests') }}" class="filters">
-    Start Date:
-    <input type="date" name="start_date" value="{{ filter_start }}">
+    <div>
+        <label>Start Date</label>
+        <input type="date" name="start_date" value="{{ filter_start }}">
+    </div>
 
-    End Date:
-    <input type="date" name="end_date" value="{{ filter_end }}">
+    <div>
+        <label>End Date</label>
+        <input type="date" name="end_date" value="{{ filter_end }}">
+    </div>
 
-    Employee:
-    <select name="employee_id">
-        <option value="" {% if not filter_employee_id %}selected{% endif %}>All</option>
-        {% for e in employees %}
-            <option value="{{ e.id }}" {% if filter_employee_id|string == e.id|string %}selected{% endif %}>{{ e.name }}</option>
-        {% endfor %}
-    </select>
+    <div>
+        <label>Employee</label>
+        <select name="employee_id">
+            <option value="" {% if not filter_employee_id %}selected{% endif %}>All</option>
+            {% for e in employees %}
+                <option value="{{ e.id }}" {% if filter_employee_id|string == e.id|string %}selected{% endif %}>{{ e.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
 
-    Status:
-    <select name="status">
-        <option value="" {% if not filter_status %}selected{% endif %}>All</option>
-        <option value="Pending" {% if filter_status == 'Pending' %}selected{% endif %}>Pending</option>
-        <option value="Approved" {% if filter_status == 'Approved' %}selected{% endif %}>Approved</option>
-        <option value="Denied" {% if filter_status == 'Denied' %}selected{% endif %}>Denied</option>
-        <option value="Cancelled" {% if filter_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
-    </select>
+    <div>
+        <label>Status</label>
+        <select name="status">
+            <option value="" {% if not filter_status %}selected{% endif %}>All</option>
+            <option value="Pending" {% if filter_status == 'Pending' %}selected{% endif %}>Pending</option>
+            <option value="Approved" {% if filter_status == 'Approved' %}selected{% endif %}>Approved</option>
+            <option value="Denied" {% if filter_status == 'Denied' %}selected{% endif %}>Denied</option>
+            <option value="Cancelled" {% if filter_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+    </div>
 
-    <button type="submit">Filter</button>
-    <a href="{{ url_for('admin_leave_requests') }}">Clear</a>
-    <a href="{{ url_for('export_admin_leave_requests', start_date=filter_start, end_date=filter_end, status=filter_status, employee_id=filter_employee_id) }}">
-        <button type="button">Export Filtered</button>
-    </a>
+    <div class="filter-actions">
+        <button type="submit">Filter</button>
+        <a href="{{ url_for('admin_leave_requests') }}" class="button secondary">Clear</a>
+        <a href="{{ url_for('export_admin_leave_requests', start_date=filter_start, end_date=filter_end, status=filter_status, employee_id=filter_employee_id) }}" class="button">Export Filtered</a>
+    </div>
 </form>
 
 <table>
@@ -63,12 +71,12 @@
         <td>{{ r.end_date }} {{ r.end_time or '' }}</td>
         <td>{{ r.reason or '' }}</td>
         <td>{% if r.attachment_count and r.attachment_count > 0 %}Yes{% else %}No{% endif %}</td>
-        <td>{{ r.status }}</td>
+        <td><span class="status">{{ r.status }}</span></td>
         <td>{{ r.submitted_at }}</td>
         <td>{{ r.reviewer_name or '' }}</td>
         <td>{{ r.reviewed_at or '' }}</td>
         <td>{{ r.review_comment or '' }}</td>
-        <td>
+        <td class="actions">
             <a href="{{ url_for('view_leave', request_id=r.id) }}">View</a>
             {% if r.status == 'Pending' %}
                 | <a href="{{ url_for('review_leave', request_id=r.id) }}">Review</a>
