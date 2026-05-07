@@ -18,7 +18,18 @@
     <br><br>
 
     Department:<br>
-    <input type="text" name="department" value="{{ emp.department if emp else '' }}">
+    <select name="department" required>
+        <option value="">Select Department</option>
+        {% for d in departments %}
+            <option value="{{ d }}"
+                {% if emp and emp.department == d %}
+                    selected
+                {% endif %}
+            >
+                {{ d }}
+            </option>
+        {% endfor %}
+    </select>
     <br><br>
 
     Supervisor:<br>

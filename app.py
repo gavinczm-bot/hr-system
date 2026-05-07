@@ -18,6 +18,16 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
 
+DEPARTMENTS = ["Sales", "Marketing", "Office", "Warehouse"]
+
+
+def normalise_department(department):
+    department = (department or "").strip()
+    for valid_department in DEPARTMENTS:
+        if department.lower() == valid_department.lower():
+            return valid_department
+    return ""
+
 
 # ---------------- DB ----------------
 def get_db():
@@ -55,6 +65,11 @@ def init_db():
 
     cur.execute("ALTER TABLE employee ADD COLUMN IF NOT EXISTS email TEXT")
     cur.execute("ALTER TABLE employee ADD COLUMN IF NOT EXISTS supervisor_id INTEGER")
+
+    cur.execute("UPDATE employee SET department = 'Sales' WHERE LOWER(TRIM(COALESCE(department, ''))) = 'sales'")
+    cur.execute("UPDATE employee SET department = 'Marketing' WHERE LOWER(TRIM(COALESCE(department, ''))) = 'marketing'")
+    cur.execute("UPDATE employee SET department = 'Office' WHERE LOWER(TRIM(COALESCE(department, ''))) = 'office'")
+    cur.execute("UPDATE employee SET department = 'Warehouse' WHERE LOWER(TRIM(COALESCE(department, ''))) = 'warehouse'")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS leave_requests (
@@ -1495,11 +1510,17 @@ def add_employee():
     if request.method == "POST":
         name = request.form["name"].strip()
         email = request.form.get("email", "").strip()
-        department = request.form.get("department", "").strip()
+        department = normalise_department(request.form.get("department", ""))
         supervisor_id = request.form.get("supervisor_id") or None
         username = request.form["username"].strip()
         password = request.form["password"]
         role = request.form["role"]
+
+        if department not in DEPARTMENTS:
+            flash("Please select a valid department.")
+            cur.close()
+            conn.close()
+            return redirect(url_for("add_employee"))
 
         try:
             cur.execute("""
@@ -1543,6 +1564,7 @@ def add_employee():
         emp=None,
         user_account=None,
         supervisors=supervisors,
+        departments=DEPARTMENTS,
         mode="add"
     )
 
@@ -1557,11 +1579,17 @@ def edit_employee(employee_id):
     if request.method == "POST":
         name = request.form["name"].strip()
         email = request.form.get("email", "").strip()
-        department = request.form.get("department", "").strip()
+        department = normalise_department(request.form.get("department", ""))
         supervisor_id = request.form.get("supervisor_id") or None
         username = request.form["username"].strip()
         password = request.form.get("password", "")
         role = request.form["role"]
+
+        if department not in DEPARTMENTS:
+            flash("Please select a valid department.")
+            cur.close()
+            conn.close()
+            return redirect(url_for("edit_employee", employee_id=employee_id))
 
         try:
             cur.execute("""
@@ -1655,6 +1683,7 @@ def edit_employee(employee_id):
         emp=emp,
         user_account=user_account,
         supervisors=supervisors,
+        departments=DEPARTMENTS,
         mode="edit"
     )
 
