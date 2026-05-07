@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h2>Leave Calendar</h2>
+
+<form method="get" action="{{ url_for('leave_calendar') }}" class="filters">
+    <div>
+        <label>Month</label>
+        <select name="month">
+            {% for m in range(1, 13) %}
+                <option value="{{ m }}" {% if month == m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <label>Year</label>
+        <input type="number" name="year" value="{{ year }}">
+    </div>
+
+    <div>
+        <label>Status</label>
+        <select name="status">
+            <option value="Active" {% if filter_status == 'Active' or not filter_status %}selected{% endif %}>Active - Pending / Approved</option>
+            <option value="All" {% if filter_status == 'All' %}selected{% endif %}>All</option>
+            <option value="Pending" {% if filter_status == 'Pending' %}selected{% endif %}>Pending</option>
+            <option value="Approved" {% if filter_status == 'Approved' %}selected{% endif %}>Approved</option>
+            <option value="Denied" {% if filter_status == 'Denied' %}selected{% endif %}>Denied</option>
+            <option value="Cancelled" {% if filter_status == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+        </select>
+    </div>
+
+    <div class="filter-actions">
+        <button type="submit">Filter</button>
+        <a class="button secondary" href="{{ url_for('leave_calendar') }}">Current Month</a>
+    </div>
+</form>
+
+<div class="calendar-toolbar">
+    <a class="button secondary" href="{{ url_for('leave_calendar', year=prev_year, month=prev_month, status=filter_status) }}">Previous</a>
+    <div class="calendar-title">{{ month_name }} {{ year }}</div>
+    <a class="button secondary" href="{{ url_for('leave_calendar', year=next_year, month=next_month, status=filter_status) }}">Next</a>
+</div>
+
+{% if current_user.role == 'admin' %}
+    <p>Admin view: showing leave requests for all employees.</p>
+{% else %}
+    <p>Employee view: showing your leave and leave requests from your department.</p>
+{% endif %}
+
+<div class="calendar-grid">
+    <div class="calendar-weekday">Mon</div>
+    <div class="calendar-weekday">Tue</div>
+    <div class="calendar-weekday">Wed</div>
+    <div class="calendar-weekday">Thu</div>
+    <div class="calendar-weekday">Fri</div>
+    <div class="calendar-weekday">Sat</div>
+    <div class="calendar-weekday">Sun</div>
+
+    {% for d in days %}
+        {% set day_key = d.isoformat() %}
+        <div class="calendar-day {% if d.month != month %}outside-month{% endif %} {% if d == today %}today{% endif %}">
+            <div class="calendar-date">{{ d.strftime('%a') }} {{ d.day }}</div>
+
+            {% for e in events_by_day[day_key] %}
+                <a class="calendar-event {% if e.is_mine %}mine{% endif %} {{ e.status|lower }}" href="{{ url_for('view_leave', request_id=e.id) }}">
+                    <strong>{{ e.employee_name }}</strong><br>
+                    {{ e.leave_type }}
+                    {% if e.department %}<br>{{ e.department }}{% endif %}
+                    <span class="event-status">{{ e.status }}</span>
+                </a>
+            {% endfor %}
+        </div>
+    {% endfor %}
+</div>
+
+{% endblock %}

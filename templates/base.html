@@ -240,6 +240,99 @@
             font-weight: 700;
         }
 
+
+
+        .calendar-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
+        }
+
+        .calendar-title {
+            font-size: 22px;
+            color: var(--bio-navy);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(120px, 1fr));
+            border-top: 1px solid var(--bio-border);
+            border-left: 1px solid var(--bio-border);
+            background: #fff;
+        }
+
+        .calendar-weekday {
+            background: var(--bio-mint);
+            color: var(--bio-navy);
+            text-transform: uppercase;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            padding: 10px;
+            border-right: 1px solid var(--bio-border);
+            border-bottom: 1px solid var(--bio-border);
+        }
+
+        .calendar-day {
+            min-height: 130px;
+            padding: 8px;
+            border-right: 1px solid var(--bio-border);
+            border-bottom: 1px solid var(--bio-border);
+            background: #fff;
+        }
+
+        .calendar-day.outside-month {
+            background: #fafafa;
+            color: var(--bio-grey);
+        }
+
+        .calendar-day.today {
+            box-shadow: inset 0 0 0 2px var(--bio-coral);
+        }
+
+        .calendar-date {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--bio-navy);
+            margin-bottom: 6px;
+        }
+
+        .calendar-event {
+            display: block;
+            padding: 6px 7px;
+            border-radius: 8px;
+            background: var(--bio-mint);
+            color: var(--bio-navy);
+            font-size: 12px;
+            line-height: 1.25;
+            margin-bottom: 5px;
+            border-left: 4px solid var(--bio-green);
+        }
+
+        .calendar-event.mine {
+            border-left-color: var(--bio-coral);
+            background: #fff3f0;
+        }
+
+        .calendar-event.cancelled,
+        .calendar-event.denied {
+            opacity: 0.65;
+        }
+
+        .calendar-event .event-status {
+            display: block;
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--bio-grey);
+            margin-top: 2px;
+        }
+
         @media (max-width: 800px) {
             body { background: #fff; }
 
@@ -372,6 +465,42 @@
 
             table.mobile-cards td.actions a,
             table.mobile-cards td.actions button { margin: 3px 4px 3px 0; }
+
+            .calendar-toolbar {
+                display: block;
+            }
+
+            .calendar-toolbar .button,
+            .calendar-toolbar button {
+                margin: 4px 2px;
+            }
+
+            .calendar-title {
+                margin: 12px 0;
+                font-size: 18px;
+            }
+
+            .calendar-grid {
+                display: block;
+                border: none;
+            }
+
+            .calendar-weekday {
+                display: none;
+            }
+
+            .calendar-day {
+                min-height: auto;
+                border: 1px solid var(--bio-border);
+                border-radius: 10px;
+                margin-bottom: 10px;
+                padding: 10px;
+            }
+
+            .calendar-day.outside-month {
+                display: none;
+            }
+
         }
     </style>
 </head>
@@ -389,6 +518,7 @@
     <a href="{{ url_for('dashboard') }}">Dashboard</a>
     <a href="{{ url_for('employee_leave_requests') }}">My Leave Requests</a>
     <a href="{{ url_for('new_leave') }}">Submit Leave</a>
+    <a href="{{ url_for('leave_calendar') }}">Calendar</a>
     <a href="{{ url_for('profile') }}">Profile</a>
 
     {% if current_user.role == 'admin' %}

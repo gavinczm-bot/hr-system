@@ -11,7 +11,8 @@ from html import escape
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, date, timedelta
+import calendar
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -606,6 +607,136 @@ def dashboard():
     )
 
 
+
+# ---------------- LEAVE CALENDAR ----------------
+@app.route("/calendar")
+@login_required
+def leave_calendar():
+    user = current_user()
+
+    today = date.today()
+
+    try:
+        year = int(request.args.get("year", today.year))
+        month = int(request.args.get("month", today.month))
+    except Exception:
+        year = today.year
+        month = today.month
+
+    if month < 1 or month > 12:
+        year = today.year
+        month = today.month
+
+    filter_status = request.args.get("status", "Active").strip()
+
+    first_day = date(year, month, 1)
+    _, last_day_num = calendar.monthrange(year, month)
+    last_day = date(year, month, last_day_num)
+
+    prev_month = month - 1
+    prev_year = year
+    if prev_month == 0:
+        prev_month = 12
+        prev_year -= 1
+
+    next_month = month + 1
+    next_year = year
+    if next_month == 13:
+        next_month = 1
+        next_year += 1
+
+    # Calendar grid starts Monday and ends Sunday.
+    grid_start = first_day - timedelta(days=first_day.weekday())
+    grid_end = last_day + timedelta(days=(6 - last_day.weekday()))
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    sql = """
+        SELECT
+            lr.id,
+            lr.employee_id,
+            lr.leave_type,
+            lr.start_date,
+            lr.end_date,
+            lr.start_time,
+            lr.end_time,
+            lr.status,
+            lr.reason,
+            e.name AS employee_name,
+            e.department,
+            CASE WHEN lr.employee_id = %s THEN 1 ELSE 0 END AS is_mine
+        FROM leave_requests lr
+        JOIN employee e ON e.id = lr.employee_id
+        WHERE lr.start_date <= %s
+          AND lr.end_date >= %s
+    """
+
+    params = [user["employee_id"], grid_end, grid_start]
+
+    if user["role"] != "admin":
+        if not user["employee_id"]:
+            cur.close()
+            conn.close()
+            flash("Calendar is only available to employee-linked accounts.")
+            return redirect(url_for("dashboard"))
+
+        sql += """
+          AND (
+                lr.employee_id = %s
+                OR (
+                    COALESCE(e.department, '') <> ''
+                    AND e.department = %s
+                )
+          )
+        """
+        params.extend([user["employee_id"], user["department"] or ""])
+
+    if filter_status == "Active" or not filter_status:
+        sql += " AND lr.status IN ('Pending', 'Approved') "
+    elif filter_status != "All":
+        sql += " AND lr.status = %s "
+        params.append(filter_status)
+
+    sql += " ORDER BY lr.start_date, e.name, lr.leave_type "
+
+    cur.execute(sql, params)
+    leave_rows = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    days = []
+    current_day = grid_start
+    while current_day <= grid_end:
+        days.append(current_day)
+        current_day += timedelta(days=1)
+
+    events_by_day = {}
+    for d in days:
+        day_events = []
+        for r in leave_rows:
+            if r["start_date"] <= d <= r["end_date"]:
+                day_events.append(r)
+        events_by_day[d.isoformat()] = day_events
+
+    return render_template(
+        "calendar.html",
+        year=year,
+        month=month,
+        month_name=calendar.month_name[month],
+        prev_year=prev_year,
+        prev_month=prev_month,
+        next_year=next_year,
+        next_month=next_month,
+        days=days,
+        events_by_day=events_by_day,
+        today=today,
+        filter_status=filter_status,
+        user=user
+    )
+
+
 # ---------------- EMPLOYEE LEAVE REQUESTS ----------------
 @app.route("/my/leave-requests")
 @login_required
@@ -816,6 +947,7 @@ def export_admin_leave_requests():
         "ID",
         "Employee",
         "Employee Email",
+        "Department",
         "Leave Type",
         "Start Date",
         "Start Time",
@@ -836,6 +968,7 @@ def export_admin_leave_requests():
             r.get("id", ""),
             r.get("employee_name", ""),
             r.get("employee_email", ""),
+            r.get("department", ""),
             r.get("leave_type", ""),
             r.get("start_date", ""),
             r.get("start_time", ""),
