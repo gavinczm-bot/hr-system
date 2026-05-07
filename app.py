@@ -113,7 +113,7 @@ def init_db():
         DO UPDATE SET
             password = EXCLUDED.password,
             role = EXCLUDED.role
-    """, ("admin", "paper1234", "admin", None))
+    """, ("admin", "bio1234", "admin", None))
 
     conn.commit()
     cur.close()
