@@ -19,6 +19,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev_secret_key")
 
 DEPARTMENTS = ["Sales", "Marketing", "Office", "Warehouse"]
+EMPLOYEE_STATUSES = ["Active", "Inactive"]
 
 
 def normalise_department(department):
@@ -65,6 +66,10 @@ def init_db():
 
     cur.execute("ALTER TABLE employee ADD COLUMN IF NOT EXISTS email TEXT")
     cur.execute("ALTER TABLE employee ADD COLUMN IF NOT EXISTS supervisor_id INTEGER")
+    cur.execute("ALTER TABLE employee ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'Active'")
+    cur.execute("UPDATE employee SET status = 'Active' WHERE status IS NULL OR TRIM(status) = ''")
+    cur.execute("UPDATE employee SET status = 'Active' WHERE LOWER(TRIM(status)) = 'active'")
+    cur.execute("UPDATE employee SET status = 'Inactive' WHERE LOWER(TRIM(status)) = 'inactive'")
 
     cur.execute("UPDATE employee SET department = 'Sales' WHERE LOWER(TRIM(COALESCE(department, ''))) = 'sales'")
     cur.execute("UPDATE employee SET department = 'Marketing' WHERE LOWER(TRIM(COALESCE(department, ''))) = 'marketing'")
@@ -489,7 +494,8 @@ def current_user():
             e.name AS employee_name,
             e.email AS employee_email,
             e.department,
-            e.supervisor_id
+            e.supervisor_id,
+            COALESCE(e.status, 'Active') AS employee_status
         FROM users u
         LEFT JOIN employee e ON e.id = u.employee_id
         WHERE u.id = %s
@@ -541,16 +547,23 @@ def login():
         cur = conn.cursor()
 
         cur.execute("""
-            SELECT *
-            FROM users
-            WHERE username = %s
-              AND password = %s
+            SELECT
+                u.*,
+                COALESCE(e.status, 'Active') AS employee_status
+            FROM users u
+            LEFT JOIN employee e ON e.id = u.employee_id
+            WHERE u.username = %s
+              AND u.password = %s
         """, (username, password))
 
         user = cur.fetchone()
 
         cur.close()
         conn.close()
+
+        if user and user["employee_id"] and user.get("employee_status") == "Inactive":
+            flash("Your account is inactive. Please contact HR or your manager.")
+            return render_template("login.html")
 
         if user:
             session["user_id"] = user["id"]
@@ -1482,6 +1495,7 @@ def admin_employees():
     cur.execute("""
         SELECT
             e.*,
+            COALESCE(e.status, 'Active') AS employee_status,
             s.name AS supervisor_name,
             u.id AS user_id,
             u.username,
@@ -1515,6 +1529,10 @@ def add_employee():
         username = request.form["username"].strip()
         password = request.form["password"]
         role = request.form["role"]
+        employee_status = request.form.get("employee_status", "Active")
+
+        if employee_status not in EMPLOYEE_STATUSES:
+            employee_status = "Active"
 
         if department not in DEPARTMENTS:
             flash("Please select a valid department.")
@@ -1524,10 +1542,10 @@ def add_employee():
 
         try:
             cur.execute("""
-                INSERT INTO employee (name, email, department, supervisor_id)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO employee (name, email, department, supervisor_id, status)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
-            """, (name, email, department, supervisor_id))
+            """, (name, email, department, supervisor_id, employee_status))
 
             employee_id = cur.fetchone()["id"]
 
@@ -1551,6 +1569,7 @@ def add_employee():
     cur.execute("""
         SELECT id, name
         FROM employee
+        WHERE COALESCE(status, 'Active') = 'Active'
         ORDER BY name
     """)
 
@@ -1565,6 +1584,7 @@ def add_employee():
         user_account=None,
         supervisors=supervisors,
         departments=DEPARTMENTS,
+        employee_statuses=EMPLOYEE_STATUSES,
         mode="add"
     )
 
@@ -1584,6 +1604,10 @@ def edit_employee(employee_id):
         username = request.form["username"].strip()
         password = request.form.get("password", "")
         role = request.form["role"]
+        employee_status = request.form.get("employee_status", "Active")
+
+        if employee_status not in EMPLOYEE_STATUSES:
+            employee_status = "Active"
 
         if department not in DEPARTMENTS:
             flash("Please select a valid department.")
@@ -1597,9 +1621,10 @@ def edit_employee(employee_id):
                 SET name = %s,
                     email = %s,
                     department = %s,
-                    supervisor_id = %s
+                    supervisor_id = %s,
+                    status = %s
                 WHERE id = %s
-            """, (name, email, department, supervisor_id, employee_id))
+            """, (name, email, department, supervisor_id, employee_status, employee_id))
 
             cur.execute("""
                 SELECT *
@@ -1666,6 +1691,7 @@ def edit_employee(employee_id):
         SELECT id, name
         FROM employee
         WHERE id <> %s
+          AND COALESCE(status, 'Active') = 'Active'
         ORDER BY name
     """, (employee_id,))
 
@@ -1684,6 +1710,7 @@ def edit_employee(employee_id):
         user_account=user_account,
         supervisors=supervisors,
         departments=DEPARTMENTS,
+        employee_statuses=EMPLOYEE_STATUSES,
         mode="edit"
     )
 

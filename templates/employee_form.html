@@ -17,6 +17,24 @@
     <input type="email" name="email" value="{{ emp.email if emp else '' }}">
     <br><br>
 
+
+    Status:<br>
+    <select name="employee_status" required>
+        {% for st in employee_statuses %}
+            <option value="{{ st }}"
+                {% if emp and (emp.status or 'Active') == st %}
+                    selected
+                {% elif not emp and st == 'Active' %}
+                    selected
+                {% endif %}
+            >
+                {{ st }}
+            </option>
+        {% endfor %}
+    </select>
+    <br>
+    <small>Inactive employees cannot log in.</small>
+    <br><br>
     Department:<br>
     <select name="department" required>
         <option value="">Select Department</option>
